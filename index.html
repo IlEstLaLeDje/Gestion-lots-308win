@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content=".308 WIN">
 <meta name="theme-color" content="#1e3050">
-<title>.308 WIN v8_7 — Rechargement & Balistique</title>
+<title>.308 WIN — Rechargement & Balistique</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,'Segoe UI',sans-serif;background:#eef2f7;color:#1e2d42;min-height:100vh;-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom)}
@@ -3271,7 +3271,8 @@ function renderLots(){
 }
 
 // ---- TIR CRUD ----
-function calcMOA(){const mm=parseFloat(fv('t-mm')),dist=parseFloat(fv('t-dist'))||100;if(mm&&dist)document.getElementById('t-moa').value=((mm/(dist/100))/29.08).toFixed(3);}
+// MOA exact : 1 MOA = π/10800 rad → à distance d (m), 1 MOA = d×π/10.8 mm → MOA = mm×10.8/(d×π)
+function calcMOA(){const mm=parseFloat(fv('t-mm')),dist=parseFloat(fv('t-dist'))||100;if(mm&&dist)document.getElementById('t-moa').value=(mm*10.8/(dist*Math.PI)).toFixed(3);}
 function tirFields(){
   return{
     date:fv('t-date')||new Date().toISOString().slice(0,10),
@@ -3694,7 +3695,32 @@ function printLabel(id){
 }
 function renderExpStats(){
   const d=getData(),t=d.lots.reduce((s,l)=>s+(l.tirs||[]).length,0),c=d.lots.reduce((s,l)=>s+(l.tirs||[]).reduce((a,t)=>a+(t.coups||0),0),0);
-  document.getElementById('exp-stats').innerHTML=`<div class="flex mb"><div class="rbox" style="flex:1"><div class="rval">${d.lots.length}</div><div class="rlbl">Lots</div></div><div class="rbox" style="flex:1"><div class="rval">${t}</div><div class="rlbl">Sessions</div></div><div class="rbox" style="flex:1"><div class="rval">${c||'—'}</div><div class="rlbl">Coups totaux</div></div></div>`;
+  // LS-01 : calcul taille localStorage (UTF-16 : 2 octets par caractère)
+  const LS_MAX_KB=5120; // 5 Mo estimé (limite standard navigateurs)
+  const lsKeys=[KEY,TKEY,SKEY,UKEY,AKEY,ARMESKEY,'308win_update_url'];
+  const usedKB=Math.round(lsKeys.reduce((sum,k)=>{const v=localStorage.getItem(k)||'';return sum+(k.length+v.length)*2;},0)/1024);
+  const pct=Math.min(100,Math.round(usedKB/LS_MAX_KB*100));
+  const lsColor=pct>=70?'#c0392b':pct>=40?'#d4900a':'#207040';
+  const lsBg=pct>=70?'#fde8e8':pct>=40?'#fef3e0':'#e0f4ea';
+  const lsBorder=pct>=70?'#f0b0b0':pct>=40?'#e8cc88':'#a8d8ba';
+  const lsIcon=pct>=70?'🔴':pct>=40?'🟠':'🟢';
+  const lsMsg=pct>=70?'⚠️ Espace critique — effectuez un backup JSON et purgez les anciennes données.':pct>=40?'Espace modéré — pensez à faire des backups réguliers.':'Espace disponible.';
+  document.getElementById('exp-stats').innerHTML=`
+    <div class="flex mb">
+      <div class="rbox" style="flex:1"><div class="rval">${d.lots.length}</div><div class="rlbl">Lots</div></div>
+      <div class="rbox" style="flex:1"><div class="rval">${t}</div><div class="rlbl">Sessions</div></div>
+      <div class="rbox" style="flex:1"><div class="rval">${c||'—'}</div><div class="rlbl">Coups totaux</div></div>
+    </div>
+    <div style="background:${lsBg};border:1px solid ${lsBorder};border-radius:6px;padding:10px 14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:12px;font-weight:600;color:${lsColor}">${lsIcon} Stockage local (localStorage)</span>
+        <span style="font-size:12px;font-weight:700;color:${lsColor}">${usedKB} Ko / ~${LS_MAX_KB} Ko (${pct}%)</span>
+      </div>
+      <div style="background:#d8e8f4;border-radius:4px;height:8px;width:100%;overflow:hidden">
+        <div style="background:${lsColor};height:100%;width:${pct}%;border-radius:4px;transition:width .4s"></div>
+      </div>
+      <div style="font-size:11px;color:${lsColor};margin-top:5px">${lsMsg}</div>
+    </div>`;
   renderPerLotExport();
 }
 function buildCSV(lots){
@@ -4065,8 +4091,8 @@ function stTouch(e,name,btn){
 }
 
 // ---- VERSION ----
-var APP_VERSION='8.8';
-var APP_DATE='2026-05-09';
+var APP_VERSION='8.9';
+var APP_DATE='2026-05-10';
 var UPDATE_URL_KEY='308win_update_url';
 
 function initVersionDisplay(){
