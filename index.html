@@ -178,11 +178,6 @@ canvas{display:block;background:#f8fafd;border-radius:6px;border:1px solid #dce8
   <div id="stab-result" style="display:none;margin-top:8px"></div>
   <div class="alert al-i" style="font-size:11px;margin-top:6px">💡 BC G7 Quantum mesuré (Doppler) — plus précis que G1 converti ×2.25. Utiliser dans votre calculateur balistique externe.</div>
   <hr class="sep">
-  <h3>Suivi usure</h3>
-  <div class="g2" style="align-items:end">
-    <div><label>Seuil d'alerte usure (coups)</label><input type="number" id="l-seuil-coups" min="0" placeholder="ex: 500 — alerte à ce total"></div>
-    <div style="display:flex;align-items:flex-end"><div class="alert al-i" style="margin:0;font-size:11px;flex:1">💡 Chaque session peut renseigner le nombre de coups tirés. Le total est affiché ici.</div></div>
-  </div>
   <div class="mt"><label>Notes</label><textarea id="l-notes" rows="2" placeholder="Observations..."></textarea></div>
   <div class="flex mt">
     <button id="save-lot-btn" class="btn bp" onclick="saveLot()">✅ Enregistrer</button>
@@ -3179,7 +3174,7 @@ function getTourelleState(){const total=fn('tr-total-v')||240,zero=fn('tr-zero-v
 function updateTourelleDisplay(){}
 
 // ---- LOT CRUD ----
-function lotFields(){return{ref:fv('l-ref').trim(),date:fv('l-date')||new Date().toISOString().slice(0,10),etui:fv('l-etui'),amorce:fv('l-amorce'),poudre:fv('l-poudre'),charge:fn('l-charge'),proj:fv('l-proj'),masse:fn('l-masse'),cbto:fn('l-cbto'),coal:fn('l-coal'),jump:fn('l-jump'),sbump:fn('l-sbump'),recuits:fi('l-recuits')||0,recharges:fi('l-recharges')||1,bc:fn('l-bc'),bcG7:fn('l-bc-g7'),longOgive:fn('l-long-ogive'),seuilCoups:fi('l-seuil-coups'),notes:fv('l-notes')};}
+function lotFields(){return{ref:fv('l-ref').trim(),date:fv('l-date')||new Date().toISOString().slice(0,10),etui:fv('l-etui'),amorce:fv('l-amorce'),poudre:fv('l-poudre'),charge:fn('l-charge'),proj:fv('l-proj'),masse:fn('l-masse'),cbto:fn('l-cbto'),coal:fn('l-coal'),jump:fn('l-jump'),sbump:fn('l-sbump'),recuits:fi('l-recuits')||0,recharges:fi('l-recharges')||1,bc:fn('l-bc'),bcG7:fn('l-bc-g7'),longOgive:fn('l-long-ogive'),notes:fv('l-notes')};}
 function saveLot(){
   const f=lotFields();if(!f.ref){alert('Référence obligatoire.');return;}
   // F-08 : Validation
@@ -3199,13 +3194,13 @@ function loadLot(id){
   const d=getData(),l=d.lots.find(x=>x.id===id);if(!l)return;
   editingLotId=id;
   const set=(i,v)=>document.getElementById(i).value=v??'';
-  set('l-ref',l.ref);set('l-date',l.date);set('l-etui',l.etui);set('l-amorce',l.amorce);set('l-poudre',l.poudre);set('l-charge',l.charge);set('l-proj',l.proj);set('l-masse',l.masse);set('l-cbto',l.cbto);set('l-coal',l.coal);set('l-jump',l.jump);set('l-sbump',l.sbump);set('l-recuits',l.recuits);set('l-recharges',l.recharges);set('l-bc',l.bc);set('l-bc-g7',l.bcG7);set('l-long-ogive',l.longOgive);set('l-seuil-coups',l.seuilCoups);set('l-notes',l.notes);
+  set('l-ref',l.ref);set('l-date',l.date);set('l-etui',l.etui);set('l-amorce',l.amorce);set('l-poudre',l.poudre);set('l-charge',l.charge);set('l-proj',l.proj);set('l-masse',l.masse);set('l-cbto',l.cbto);set('l-coal',l.coal);set('l-jump',l.jump);set('l-sbump',l.sbump);set('l-recuits',l.recuits);set('l-recharges',l.recharges);set('l-bc',l.bc);set('l-bc-g7',l.bcG7);set('l-long-ogive',l.longOgive);set('l-notes',l.notes);
   calcStabilite();checkCoalVsChargeur();
   document.getElementById('save-lot-btn').textContent='✏️ Mettre à jour';document.getElementById('lot-edit-banner').style.display='block';
   window.scrollTo({top:0,behavior:'smooth'});renderLots();
 }
 function cancelLotEdit(){editingLotId=null;document.getElementById('save-lot-btn').textContent='✅ Enregistrer';document.getElementById('lot-edit-banner').style.display='none';renderLots();}
-function clearLotForm(){cancelLotEdit();['l-ref','l-date','l-etui','l-amorce','l-poudre','l-charge','l-proj','l-masse','l-cbto','l-coal','l-jump','l-sbump','l-recuits','l-recharges','l-bc','l-bc-g7','l-long-ogive','l-seuil-coups','l-notes'].forEach(id=>document.getElementById(id).value='');document.getElementById('l-date').value=new Date().toISOString().slice(0,10);const sr=document.getElementById('stab-result');if(sr)sr.style.display='none';}
+function clearLotForm(){cancelLotEdit();['l-ref','l-date','l-etui','l-amorce','l-poudre','l-charge','l-proj','l-masse','l-cbto','l-coal','l-jump','l-sbump','l-recuits','l-recharges','l-bc','l-bc-g7','l-long-ogive','l-notes'].forEach(id=>document.getElementById(id).value='');document.getElementById('l-date').value=new Date().toISOString().slice(0,10);const sr=document.getElementById('stab-result');if(sr)sr.style.display='none';}
 function deleteLot(id){if(!confirm('Supprimer ce lot ?'))return;if(editingLotId===id)cancelLotEdit();const d=getData();d.lots=d.lots.filter(l=>l.id!==id);setData(d);renderLots();}
 function duplicateLot(id){
   const d=getData(),l=d.lots.find(x=>x.id===id);if(!l)return;
@@ -3214,7 +3209,7 @@ function duplicateLot(id){
   // Pre-fill form with duplicate for quick edit
   editingLotId=null;
   const set=(i,v)=>document.getElementById(i).value=v??'';
-  set('l-ref',newLot.ref);set('l-date',newLot.date);set('l-etui',newLot.etui);set('l-amorce',newLot.amorce);set('l-poudre',newLot.poudre);set('l-charge',newLot.charge);set('l-proj',newLot.proj);set('l-masse',newLot.masse);set('l-cbto',newLot.cbto);set('l-coal',newLot.coal);set('l-jump',newLot.jump);set('l-sbump',newLot.sbump);set('l-recuits',newLot.recuits);set('l-recharges',newLot.recharges);set('l-bc',newLot.bc);set('l-bc-g7',newLot.bcG7);set('l-long-ogive',newLot.longOgive);set('l-seuil-coups',newLot.seuilCoups);set('l-notes',newLot.notes);
+  set('l-ref',newLot.ref);set('l-date',newLot.date);set('l-etui',newLot.etui);set('l-amorce',newLot.amorce);set('l-poudre',newLot.poudre);set('l-charge',newLot.charge);set('l-proj',newLot.proj);set('l-masse',newLot.masse);set('l-cbto',newLot.cbto);set('l-coal',newLot.coal);set('l-jump',newLot.jump);set('l-sbump',newLot.sbump);set('l-recuits',newLot.recuits);set('l-recharges',newLot.recharges);set('l-bc',newLot.bc);set('l-bc-g7',newLot.bcG7);set('l-long-ogive',newLot.longOgive);set('l-notes',newLot.notes);
   calcStabilite();checkCoalVsChargeur();
   document.getElementById('save-lot-btn').textContent='✅ Enregistrer';
   document.getElementById('lot-edit-banner').style.display='none';
@@ -4091,7 +4086,7 @@ function stTouch(e,name,btn){
 }
 
 // ---- VERSION ----
-var APP_VERSION='8.9';
+var APP_VERSION='8.10';
 var APP_DATE='2026-05-10';
 var UPDATE_URL_KEY='308win_update_url';
 
