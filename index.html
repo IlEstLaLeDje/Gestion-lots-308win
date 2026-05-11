@@ -3235,17 +3235,7 @@ function renderLots(){
     const totalCoups=(l.tirs||[]).reduce((s,t)=>s+(t.coups||0),0);
     let coupsCell='';
     if(totalCoups>0){
-      const cl=l.seuilCoups&&totalCoups>=l.seuilCoups?'bg-rd':l.seuilCoups&&totalCoups>=l.seuilCoups*0.8?'bg-or':'bg-gr';
-      const barColor=l.seuilCoups&&totalCoups>=l.seuilCoups?'#c0392b':l.seuilCoups&&totalCoups>=l.seuilCoups*0.8?'#d4900a':'#207040';
-      const pct=l.seuilCoups?Math.min(100,Math.round((totalCoups/l.seuilCoups)*100)):null;
-      coupsCell=`<span class="badge ${cl}" style="font-size:12px;font-weight:700">${totalCoups}</span>`;
-      if(l.seuilCoups){
-        coupsCell+=`<div style="font-size:10px;color:#8090a0;margin-top:2px">/ ${l.seuilCoups} seuil</div>
-        <div style="background:#d8e8f4;border-radius:3px;height:5px;width:70px;margin-top:2px">
-          <div style="background:${barColor};height:100%;width:${pct}%;border-radius:3px"></div>
-        </div>`;
-        if(totalCoups>=l.seuilCoups)coupsCell+='<div style="color:#e05050;font-size:10px;margin-top:1px">🚨 Seuil atteint</div>';
-      }
+      coupsCell=`<span class="badge bg-gr" style="font-size:12px;font-weight:700">${totalCoups}</span>`;
     }else{coupsCell='<span style="color:#b0c0d0">—</span>';}
     h+=`<tr class="clickable${isEd?' editing':''}" onclick="loadLot('${l.id}')">
       <td><strong>${l.ref}</strong>${isEd?' <span style="color:#a070e0;font-size:10px">✏️</span>':''}</td>
@@ -3320,14 +3310,9 @@ function renderTirSessions(){
   const d=getData(),lot=d.lots.find(l=>l.id===lotId);
   if(!lot||!lot.tirs||!lot.tirs.length){c.innerHTML='<div class="nd">Aucune session pour ce lot.</div>';return;}
   const totalCoups=lot.tirs.reduce((s,t)=>s+(t.coups||0),0);
-  const seuilCoups=lot.seuilCoups;
   let coupInfo='';
   if(totalCoups>0){
-    const cl=seuilCoups&&totalCoups>=seuilCoups?'bg-rd':seuilCoups&&totalCoups>=seuilCoups*0.8?'bg-or':'bg-gr';
-    coupInfo=`<div class="alert ${seuilCoups&&totalCoups>=seuilCoups?'al-d':seuilCoups&&totalCoups>=seuilCoups*0.8?'al-w':'al-s'} mb">
-      💥 Total coups tirés : <strong>${totalCoups}</strong>${seuilCoups?' / seuil '+seuilCoups:''}
-      ${seuilCoups&&totalCoups>=seuilCoups?' — <strong>🚨 Seuil atteint !</strong>':seuilCoups&&totalCoups>=seuilCoups*0.8?' — ⚠️ Approche du seuil.':''}
-    </div>`;
+    coupInfo=`<div class="alert al-s mb">💥 Total coups tirés : <strong>${totalCoups}</strong></div>`;
   }
   let h=coupInfo+'<div class="ovx"><table><thead><tr><th>Date</th><th>Dist.</th><th>V₀ moy.</th><th>ES</th><th>SD</th><th>Grp mm</th><th>Grp MOA</th><th>°C</th><th>P (mbar)</th><th>Coups</th><th>Notes</th><th></th></tr></thead><tbody>';
   lot.tirs.forEach(t=>{
@@ -3835,7 +3820,7 @@ function terrainLotChanged(){
     const lastTir=(l.tirs||[]).slice(-1)[0];
     info.style.display='block';
     info.innerHTML=`📦 <strong>${l.ref}</strong> · ${l.proj||'—'} · ${l.poudre||'—'} ${l.charge?l.charge+' gr':''}
-      ${total>0?`· <strong>${total} coups</strong>${l.seuilCoups?' / '+l.seuilCoups:''}`:''} 
+      ${total>0?`· <strong>${total} coups</strong>`:''} 
       ${lastTir?`<br>📅 Dernière session : ${lastTir.date} · ${lastTir.dist?lastTir.dist+' m':'—'}`:''} `;
     // Pré-remplir distance depuis dernière session
     if(lastTir&&lastTir.dist&&!document.getElementById('terrain-dist').value)
@@ -4086,7 +4071,7 @@ function stTouch(e,name,btn){
 }
 
 // ---- VERSION ----
-var APP_VERSION='8.10';
+var APP_VERSION='8.11';
 var APP_DATE='2026-05-10';
 var UPDATE_URL_KEY='308win_update_url';
 
