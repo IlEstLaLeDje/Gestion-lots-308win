@@ -81,6 +81,7 @@ canvas{display:block;background:#f8fafd;border-radius:6px;border:1px solid #dce8
   <button onclick="showTab('lots',this)" ontouchend="stTouch(event,'lots',this)">📦 Lots</button>
   <button onclick="showTab('tir',this)" ontouchend="stTouch(event,'tir',this)">🎯 Tir</button>
   <button onclick="showTab('analyse',this)" ontouchend="stTouch(event,'analyse',this)">📊 Analyse</button>
+  <button onclick="showTab('entretien',this)" ontouchend="stTouch(event,'entretien',this)">🔧 Entretien</button>
   <button onclick="showTab('export',this)" ontouchend="stTouch(event,'export',this)">💾 Export</button>
 </nav>
 
@@ -208,6 +209,7 @@ canvas{display:block;background:#f8fafd;border-radius:6px;border:1px solid #dce8
     <select id="tir-lot" style="flex:1" onchange="renderTirSessions()"><option value="">— Sélectionner un lot —</option></select>
   </div>
   <h2>📋 Sessions de ce lot <span style="font-size:11px;color:#506080;font-weight:400">— cliquer pour rappeler</span></h2>
+  <div id="maintenance-banner" style="margin-bottom:14px"></div>
   <div id="tir-list"><div class="nd">Sélectionnez un lot.</div></div>
 </div>
 <!-- V0 multi-valeurs -->
@@ -236,7 +238,7 @@ canvas{display:block;background:#f8fafd;border-radius:6px;border:1px solid #dce8
   <h2>🔫 Saisie session de tir</h2>
   <div class="g3" style="align-items:end">
     <div><label>Date</label><input type="date" id="t-date"></div>
-    <div><label>Distance (m)</label><input type="number" id="t-dist" placeholder="ex: 100" oninput="calcMOA()"></div>
+    <div><label>Distance (m)</label><input type="number" id="t-dist" placeholder="ex: 100" oninput="calcMOA();cibleRefreshMOA()"></div>
     <div><label id="lbl-t-v0">V₀ moy. mesurée (m/s)</label><input type="number" id="t-v0" step="0.1" placeholder="ex: 820"></div>
     <div><label id="lbl-t-es">ES — Extreme Spread (m/s)</label><input type="number" id="t-es" step="0.1" placeholder="ex: 12"></div>
     <div><label id="lbl-t-sd">SD — Std Deviation (m/s)</label><input type="number" id="t-sd" step="0.1" placeholder="ex: 4"></div>
@@ -254,6 +256,68 @@ canvas{display:block;background:#f8fafd;border-radius:6px;border:1px solid #dce8
     <button class="btn bs" onclick="clearTirForm()">🗑 Effacer tout</button>
   </div>
 </div>
+
+<!-- MODULE ANALYSE CIBLE PHOTO -->
+<div class="card" id="card-cible-photo">
+  <h2>📷 Analyse de cible — Groupement par photo</h2>
+  <!-- Label lot + session -->
+  <div id="cible-session-label" style="display:none;background:#1e3050;color:#b8d0f0;border-radius:6px;padding:8px 14px;margin-bottom:10px;font-size:12px;font-weight:600;letter-spacing:.3px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span>📦 <span id="csl-lot">—</span></span>
+    <span style="color:#607080">|</span>
+    <span>📅 <span id="csl-date">—</span></span>
+    <span style="color:#607080">|</span>
+    <span>📏 <span id="csl-dist">—</span></span>
+  </div>
+  <div id="cible-session-banner" style="display:none" class="alert al-i mb"></div>
+  <p style="font-size:12px;color:#5070a0;margin-bottom:12px">Importez une photo de votre cible, calibrez l'échelle (2 points de référence), placez chaque impact — le groupement ES et les MOA sont calculés puis injectés dans le formulaire ci-dessus. L'analyse est enregistrée automatiquement avec la session.</p>
+
+  <!-- Résultats enregistrés (sans photo) -->
+  <div id="cible-stored-results" style="display:none;margin-bottom:12px">
+    <div style="background:#f0f5fc;border-radius:6px;padding:12px;border:1px solid #c8daea">
+      <div style="font-size:12px;font-weight:700;color:#2a6090;margin-bottom:8px">📂 Analyse enregistrée — rechargez la photo pour rééditer</div>
+      <div id="cible-stored-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"></div>
+      <div id="cible-stored-alert" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <div class="flex mb" style="gap:8px;flex-wrap:wrap;align-items:center">
+    <button class="btn bs" onclick="document.getElementById('cible-file').click()">📂 Charger photo</button>
+    <input type="file" id="cible-file" accept="image/*" style="display:none" onchange="loadCiblePhoto(event)">
+    <button class="btn bo" id="btn-cible-calib" onclick="cibleSetMode('calib')" style="display:none">📐 Calibrer échelle</button>
+    <button class="btn bs" id="btn-cible-impact" onclick="cibleSetMode('impact')" style="display:none">🎯 Placer impacts</button>
+    <button class="btn bd" id="btn-cible-undo" onclick="cibleUndo()" style="display:none">↩ Défaire</button>
+    <button class="btn bd" id="btn-cible-clearall" onclick="cibleClearImpacts()" style="display:none">🗑 Impacts</button>
+  </div>
+  <div id="cible-mode-banner" style="display:none;font-size:12px;padding:7px 12px;border-radius:5px;margin-bottom:10px;font-weight:500"></div>
+
+  <!-- Calibration row -->
+  <div id="cible-calib-row" style="display:none;margin-bottom:12px">
+    <div class="g2" style="align-items:end">
+      <div>
+        <label>Distance réelle entre les 2 points A et B (mm)</label>
+        <input type="number" id="cible-ref-mm" placeholder="ex: 100" step="0.1" min="0.1" oninput="cibleApplyCalib()">
+        <div style="font-size:10px;color:#6080a0;margin-top:3px">Ex : diamètre d'un anneau connu, espacement de grille, etc.</div>
+      </div>
+      <div id="cible-calib-status" style="font-size:12px;padding:10px 0;color:#6080a0"></div>
+    </div>
+  </div>
+
+  <!-- Canvas zone -->
+  <div id="cible-canvas-outer" style="display:none">
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:6px;border:1px solid #d0dce8">
+      <canvas id="cible-canvas" style="cursor:crosshair;display:block;max-width:100%;touch-action:none"></canvas>
+    </div>
+    <div id="cible-result-row" style="margin-top:12px"></div>
+    <div id="cible-inject-row" style="margin-top:8px;display:none">
+      <button class="btn bg" style="font-size:14px;padding:10px 20px" onclick="cibleInjectGroupement()">✅ Injecter groupement dans le formulaire</button>
+    </div>
+  </div>
+
+  <div id="cible-empty-msg" style="text-align:center;padding:24px;color:#90a8c0;font-style:italic;font-size:13px">
+    📷 Chargez une photo de cible pour commencer l'analyse.
+  </div>
+</div>
+
 </div>
 
 <!-- ANALYSE -->
@@ -287,6 +351,150 @@ canvas{display:block;background:#f8fafd;border-radius:6px;border:1px solid #dce8
 </div>
 
 
+
+<!-- ENTRETIEN -->
+<div id="tab-entretien" class="tab">
+
+<!-- Compteur global maintenance -->
+<div id="entretien-counter-card" class="card">
+  <h2>🔧 Compteur de maintenance</h2>
+  <div id="entretien-counter-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px"></div>
+  <div id="entretien-due-alerts"></div>
+</div>
+
+<!-- I. Rodage -->
+<div class="card">
+  <h2>🔩 I. Rodage du canon — 12 tirs (Protocole Pragmatique)</h2>
+  <div class="alert al-i mb" style="font-size:12px">Utilisez le solvant <strong>Bore Tech Eliminator</strong>. Ce protocole s'applique une seule fois à la mise en service du canon.</div>
+  <div class="ovx">
+  <table>
+    <thead><tr><th>Phase</th><th>Action</th><th>Nettoyage</th><th>Répétition</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Phase 1</strong></td><td>1 Tir</td><td>Bore Tech + Brosse nylon + Séchage</td><td>3 fois</td></tr>
+      <tr><td><strong>Phase 2</strong></td><td>3 Tirs</td><td>Bore Tech + Brosse nylon + Séchage</td><td>3 fois</td></tr>
+      <tr><td><strong>Phase 3</strong></td><td>Zéro 100 m</td><td>Nettoyage complet final au Bore Tech</td><td>Hornady 165 gr</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- II. Entretien après séance -->
+<div class="card">
+  <h2>🧹 II. Entretien systématique — Après CHAQUE séance</h2>
+  <div class="alert al-d mb" style="font-size:12px"><strong>IMPORTANT : Démontez toujours le silencieux après le tir. Ne jamais stocker l'arme avec le silencieux monté</strong> (condensation acide).</div>
+  <div class="alert al-i mb" style="font-size:12px">💧 <strong>Coup d'huile :</strong> Passer un patch SEC avant le 1er tir de chaque séance.</div>
+  <div class="ovx">
+  <table>
+    <thead><tr><th>Élément</th><th>Action</th><th>Produit / Consigne</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Canon (Intérieur)</strong></td><td>Décuivrage / Décarbonage</td><td>Bore Tech Eliminator</td></tr>
+      <tr><td><strong>Silencieux Stalon</strong></td><td>Démontage et aération</td><td>Séchage à l'air libre (verticalement)</td></tr>
+      <tr><td><strong>Filetage Canon</strong></td><td>Nettoyage et graissage</td><td>Graisse technique haute température</td></tr>
+      <tr><td><strong>Culasse</strong></td><td>Nettoyage face de tir / Extracteur</td><td>Chiffon sec ou solvant léger</td></tr>
+      <tr><td><strong>Tenons de culasse</strong></td><td>Lubrification légère</td><td>Graisse technique</td></tr>
+      <tr><td><strong>Canon (Extérieur)</strong></td><td>Protection anti-corrosion</td><td>Huile de lubrification fine</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- III. Maintenance périodique -->
+<div class="card">
+  <h2>📅 III. Échéances de maintenance périodiques</h2>
+  <div class="ovx">
+  <table>
+    <thead><tr><th>Fréquence</th><th>Élément</th><th>Action / Valeur</th><th>Produit</th></tr></thead>
+    <tbody>
+      <tr style="background:#fff8e8">
+        <td><span class="badge bg-or">Tous les 200 tirs</span></td>
+        <td><strong>Canon</strong> (Désencuivrage)</td>
+        <td>Bore Tech (laisser agir 10–15 min)</td>
+        <td>Bore Tech Eliminator</td>
+      </tr>
+      <tr style="background:#fff8e8">
+        <td><span class="badge bg-or">Tous les 200 tirs</span></td>
+        <td><strong>Silencieux Stalon</strong></td>
+        <td>Nettoyage interne</td>
+        <td>Produit <strong>Guntec</strong></td>
+      </tr>
+      <tr style="background:#fff8e8">
+        <td><span class="badge bg-or">Tous les 200 tirs</span></td>
+        <td><strong>Vis de pontet</strong> (Boîtier)</td>
+        <td>Serrage à <strong>3,4 N·m</strong> (30 in·lbs)</td>
+        <td>—</td>
+      </tr>
+      <tr style="background:#fff8e8">
+        <td><span class="badge bg-or">Tous les 200 tirs</span></td>
+        <td><strong>Colliers de lunette</strong></td>
+        <td>Serrage à <strong>2,0 N·m</strong> (18 in·lbs)</td>
+        <td>—</td>
+      </tr>
+      <tr style="background:#f0faf5">
+        <td><span class="badge bg-bl">Toutes les 3 séances</span></td>
+        <td><strong>Détente / Mécanisme</strong></td>
+        <td>Soufflage poussières (air sec) — <strong>PAS D'HUILE</strong></td>
+        <td>Air comprimé sec</td>
+      </tr>
+      <tr style="background:#fde8e8">
+        <td><span class="badge bg-rd">Tous les 1000 tirs</span></td>
+        <td><strong>Percuteur</strong></td>
+        <td>Nettoyage interne culasse — <strong>Laisser SEC</strong></td>
+        <td>—</td>
+      </tr>
+      <tr style="background:#fde8e8">
+        <td><span class="badge bg-rd">Tous les 1000 tirs</span></td>
+        <td><strong>Bouche du canon</strong></td>
+        <td>Inspection de l'état de la couronne</td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- IV. Serrage optique -->
+<div class="card">
+  <h2>🔭 IV. Serrage de l'optique en croix</h2>
+  <div class="alert al-w" style="font-size:12px;margin-bottom:12px">
+    Approchez les vis et serrez-les progressivement en alternant <strong>diagonalement</strong> (Haut-G/Bas-D, puis Haut-D/Bas-G) par paliers (ex : 1,0 N·m puis 2,0 N·m final) pour ne pas contraindre le tube de la lunette.
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+    <div class="rbox"><div style="font-size:14px;font-weight:700;color:#2a6090">Palier 1</div><div style="font-size:22px;font-weight:700;color:#b07010">1,0 N·m</div><div class="rlbl">Approche — Haut-G/Bas-D</div></div>
+    <div class="rbox"><div style="font-size:14px;font-weight:700;color:#2a6090">Palier 2</div><div style="font-size:22px;font-weight:700;color:#207040">2,0 N·m</div><div class="rlbl">Final — Haut-D/Bas-G</div></div>
+  </div>
+  <div style="font-size:10px;color:#8090a8;margin-top:10px;text-align:right">Document de Maintenance · Browning AB3+ | Stalon X108 | Bore Tech | Guntec</div>
+</div>
+
+<!-- Journal maintenance -->
+<div class="card">
+  <h2>📓 Journal de maintenance</h2>
+  <div style="font-size:12px;color:#5070a0;margin-bottom:10px">Enregistrez les opérations de maintenance effectuées. Document de référence interne — lecture/écriture.</div>
+  <div class="g2 mb" style="align-items:end">
+    <div>
+      <label>Date</label>
+      <input type="date" id="mnt-date">
+    </div>
+    <div>
+      <label>Type de maintenance</label>
+      <select id="mnt-type">
+        <option value="200tirs">200 tirs — Canon / Silencieux / Vis / Colliers</option>
+        <option value="1000tirs">1000 tirs — Percuteur / Bouche canon</option>
+        <option value="seance">Fin de séance — Nettoyage complet</option>
+        <option value="optique">Vérification optique / Colliers</option>
+        <option value="autre">Autre</option>
+      </select>
+    </div>
+  </div>
+  <div class="mb"><label>Coups totaux au moment de la maintenance</label><input type="number" id="mnt-coups" placeholder="ex: 400"></div>
+  <div class="mb"><label>Notes</label><textarea id="mnt-notes" rows="2" placeholder="Observations, produits utilisés..."></textarea></div>
+  <div class="flex mb">
+    <button class="btn bp" onclick="saveMaintenance()">✅ Enregistrer</button>
+    <button class="btn bs" onclick="clearMaintenanceForm()">🗑 Effacer</button>
+  </div>
+  <div id="mnt-list" style="margin-top:10px"></div>
+</div>
+
+</div><!-- /tab-entretien -->
 
 <!-- EXPORT -->
 <div id="tab-export" class="tab">
@@ -2893,9 +3101,9 @@ function showTab(name,btn){
   document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(e=>e.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');btn.classList.add('active');
-  if(name==='tir')refreshLotSel('tir-lot');
+  if(name==='tir'){refreshLotSel('tir-lot');cibleUpdateSessionBanner();renderMaintenanceAlerts();}
   if(name==='analyse')refreshAnalyse();
-
+  if(name==='entretien'){renderMaintenanceAlerts();document.getElementById('mnt-date').value=new Date().toISOString().slice(0,10);}
   if(name==='export'){renderExpStats();loadSettings();}
 }
 function refreshLotSel(selId,filterBal=false){
@@ -3275,11 +3483,90 @@ function saveTir(){
   const lotId=fv('tir-lot');if(!lotId){alert('Sélectionnez un lot.');return;}
   const f=tirFields(),d=getData(),lot=d.lots.find(l=>l.id===lotId);if(!lot)return;
   if(!lot.tirs)lot.tirs=[];
-  if(editingTirId&&editingTirLotId===lotId){const idx=lot.tirs.findIndex(t=>t.id===editingTirId);if(idx>=0)lot.tirs[idx]={...lot.tirs[idx],...f};editingTirId=null;editingTirLotId=null;document.getElementById('save-tir-btn').textContent='✅ Enregistrer';document.getElementById('tir-edit-banner').style.display='none';}
-  else lot.tirs.push({id:uid(),...f});
-  setData(d);document.getElementById('t-date').value=new Date().toISOString().slice(0,10);renderTirSessions();
+  // Construire les données cible à sauvegarder
+  var cibleToSave = null;
+  if(_cbl.impacts && _cbl.impacts.length > 0) {
+    var cES = cibleCalcES();
+    var dist = parseFloat(document.getElementById('t-dist').value) || 100;
+    var esMm = (cES && _cbl.scalePxPerMm) ? (cES.dist / _cbl.scalePxPerMm).toFixed(1) : null;
+    var esMoa = (esMm && _cbl.scalePxPerMm) ? (parseFloat(esMm)*10.8/(dist*Math.PI)).toFixed(3) : null;
+    var mpi = _cbl.impacts.length>=2 ? cibleCalcMPI() : null;
+    var maxR = 0;
+    if(mpi && _cbl.scalePxPerMm) {
+      for(var i=0;i<_cbl.impacts.length;i++){var dx=_cbl.impacts[i].x-mpi.x,dy=_cbl.impacts[i].y-mpi.y;var r=Math.sqrt(dx*dx+dy*dy);if(r>maxR)maxR=r;}
+    }
+    var rayonMm = (mpi && _cbl.scalePxPerMm) ? (maxR/_cbl.scalePxPerMm).toFixed(1) : null;
+    cibleToSave = {
+      impacts: _cbl.impacts.slice(),
+      calibPts: (_cbl.calibPts||[]).slice(),
+      scalePxPerMm: _cbl.scalePxPerMm||null,
+      refMm: parseFloat(document.getElementById('cible-ref-mm').value)||null,
+      nbImpacts: _cbl.impacts.length,
+      esMm: esMm ? parseFloat(esMm) : null,
+      esMoa: esMoa ? parseFloat(esMoa) : null,
+      rayonMm: rayonMm ? parseFloat(rayonMm) : null
+    };
+  }
+  if(editingTirId&&editingTirLotId===lotId){const idx=lot.tirs.findIndex(t=>t.id===editingTirId);if(idx>=0){lot.tirs[idx]={...lot.tirs[idx],...f};if(cibleToSave!==null)lot.tirs[idx].cibleData=cibleToSave;}editingTirId=null;editingTirLotId=null;document.getElementById('save-tir-btn').textContent='✅ Enregistrer';document.getElementById('tir-edit-banner').style.display='none';}
+  else {
+    const nEntry={id:uid(),...f};if(cibleToSave!==null)nEntry.cibleData=cibleToSave;lot.tirs.push(nEntry);
+    // Déplacer la photo _pending vers l'ID définitif
+    loadPhoto('_pending').then(function(blob){ if(blob){savePhoto(nEntry.id,blob).then(function(){deletePhoto('_pending');});} }).catch(function(){});
+  }
+  setData(d);document.getElementById('t-date').value=new Date().toISOString().slice(0,10);renderTirSessions();cibleUpdateSessionBanner();cibleUpdateSessionLabel();renderMaintenanceAlerts();
 }
+
+function cibleFullReset() {
+  if (typeof _cbl === 'undefined') return;
+  _cbl.impacts = [];
+  _cbl.calibPts = [];
+  _cbl.scalePxPerMm = null;
+  _cbl.img = null;
+  _cbl.mode = null;
+  
+  var ids = ['cible-ref-mm', 'cible-stored-results', 'cible-result-row', 'cible-inject-row', 'cible-canvas-outer'];
+  for (var i = 0; i < ids.length; i++) {
+    var el = document.getElementById(ids[i]);
+    if (el) {
+      if (ids[i] === 'cible-ref-mm') el.value = '';
+      else if (ids[i] === 'cible-result-row') el.innerHTML = '';
+      else el.style.display = 'none';
+    }
+  }
+
+  var em = document.getElementById('cible-empty-msg'); 
+  if (em) em.style.display = '';
+  
+  var mb = document.getElementById('cible-mode-banner');
+  if (mb) { 
+    mb.style.display = 'none'; 
+    mb.innerHTML = ''; 
+    mb.className = ''; 
+  }
+
+  var btnIds = ['btn-cible-calib', 'btn-cible-impact', 'btn-cible-undo', 'btn-cible-clearall'];
+  for (var j = 0; j < btnIds.length; j++) {
+    var btn = document.getElementById(btnIds[j]);
+    if (btn) btn.style.display = 'none';
+  }
+
+  if (typeof cibleUpdateSessionBanner === 'function') cibleUpdateSessionBanner();
+  if (typeof cibleUpdateSessionLabel === 'function') cibleUpdateSessionLabel();
+
+  // Réinitialiser l'input fichier — sans ça, si le même fichier est resélectionné
+  // après un changement de session, l'événement 'change' ne se déclenche pas (valeur inchangée pour le DOM).
+  var fi = document.getElementById('cible-file');
+  if (fi) fi.value = '';
+
+  var canvas = document.getElementById('cible-canvas');
+  if (canvas) {
+    var ctx = canvas.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
 function loadTir(lotId,tirId){
+  cibleFullReset();
   const d=getData(),lot=d.lots.find(l=>l.id===lotId);if(!lot)return;
   const t=lot.tirs.find(x=>x.id===tirId);if(!t)return;
   editingTirId=tirId;editingTirLotId=lotId;
@@ -3294,18 +3581,77 @@ function loadTir(lotId,tirId){
   // F-07 : restaurer le graphique shot-by-shot si shots stockés
   if(t.shots&&t.shots.length){
     document.getElementById('v0-multi').value=t.shots.map(v=>toDisplayUnit(v).toFixed(1)).join('\n');
-    const m=t.shots.reduce((a,b)=>a+b,0)/t.shots.length;
-    drawShotChart(t.shots,m);
-    document.getElementById('v0-shot-chart-wrap').style.display='block';
+    calcV0Stats(); // met à jour les boîtes V₀/ES/SD, _v0Stats, et le graphique
+  } else {
+    document.getElementById('v0-multi').value='';
+    document.getElementById('v0-stats-result').innerHTML='';
+    document.getElementById('v0-shot-chart-wrap').style.display='none';
+    _v0Stats=null;
   }
   document.getElementById('save-tir-btn').textContent='✏️ Mettre à jour';document.getElementById('tir-edit-banner').style.display='block';
+  // Restaurer les données cible si disponibles
+  if(t.cibleData && t.cibleData.nbImpacts > 0) {
+    _cbl.impacts = (t.cibleData.impacts||[]).map(function(p){return{x:p.x,y:p.y};});
+    _cbl.calibPts = (t.cibleData.calibPts||[]).map(function(p){return{x:p.x,y:p.y};});
+    _cbl.scalePxPerMm = t.cibleData.scalePxPerMm||null;
+    _cbl.img = null;
+    if(t.cibleData.refMm) document.getElementById('cible-ref-mm').value = t.cibleData.refMm;
+    // Afficher le panneau résultats stockés (sera remplacé si photo trouvée)
+    cibleShowStoredResults(t.cibleData, t.coups);
+    // Tentative de restauration de la photo depuis IndexedDB
+    loadPhoto(tirId).then(function(blob) {
+      if (!blob) return; // pas de photo enregistrée — panneau stocké reste visible
+      var url = URL.createObjectURL(blob);
+      var img = new Image();
+      img.onload = function() {
+        _cbl.img = img;
+        // Masquer le panneau résultats stockés, montrer le canevas
+        var sr = document.getElementById('cible-stored-results');
+        if (sr) sr.style.display = 'none';
+        document.getElementById('cible-empty-msg').style.display = 'none';
+        document.getElementById('cible-canvas-outer').style.display = 'block';
+        ['btn-cible-calib','btn-cible-impact','btn-cible-undo','btn-cible-clearall'].forEach(function(id){
+          document.getElementById(id).style.display = 'inline-block';
+        });
+        cibleInitCanvas();
+        // Mode impact direct (impacts restaurés)
+        _cbl.mode = 'impact';
+        var banner = document.getElementById('cible-mode-banner');
+        if (banner) {
+          banner.style.display = 'block';
+          banner.style.background = '#e8f8ef'; banner.style.border = '1px solid #60c080'; banner.style.color = '#1a6030';
+          banner.textContent = '🎯 Session restaurée — ' + _cbl.impacts.length + ' impact(s) rechargé(s) + photo. Clic droit = défaire. MPI en vert, ES en pointillés.';
+        }
+        var calibRow = document.getElementById('cible-calib-row');
+        if (calibRow) calibRow.style.display = 'none';
+        var btnI = document.getElementById('btn-cible-impact'), btnC = document.getElementById('btn-cible-calib');
+        if (btnI) { btnI.style.fontWeight = '700'; btnI.style.background = '#e0f4ea'; }
+        if (btnC) { btnC.style.fontWeight = ''; btnC.style.background = ''; }
+        cibleRedraw();
+        cibleUpdateResults();
+      };
+      img.onerror = function() {}; // blob invalide — on reste sur le panneau stocké
+      img.src = url;
+    }).catch(function(){});
+  } else {
+    _cbl.impacts = []; _cbl.calibPts = []; _cbl.scalePxPerMm = null; _cbl.img = null;
+    var sr=document.getElementById('cible-stored-results');if(sr)sr.style.display='none';
+    cibleUpdateResults();
+  }
+  cibleUpdateSessionBanner();
+  cibleUpdateSessionLabel();
   window.scrollTo({top:0,behavior:'smooth'});renderTirSessions();
 }
-function cancelTirEdit(){editingTirId=null;editingTirLotId=null;document.getElementById('save-tir-btn').textContent='✅ Enregistrer';document.getElementById('tir-edit-banner').style.display='none';renderTirSessions();}
-function clearTirForm(){cancelTirEdit();['t-date','t-dist','t-temp','t-v0','t-es','t-sd','t-mm','t-moa','t-coups','t-pres','t-notes'].forEach(id=>document.getElementById(id).value='');document.getElementById('t-date').value=new Date().toISOString().slice(0,10);document.getElementById('v0-multi').value='';document.getElementById('v0-stats-result').innerHTML='';document.getElementById('v0-shot-chart-wrap').style.display='none';_v0Stats=null;}
-function deleteTir(lotId,tirId){if(!confirm('Supprimer cette session ?'))return;if(editingTirId===tirId)cancelTirEdit();const d=getData(),lot=d.lots.find(l=>l.id===lotId);if(lot)lot.tirs=lot.tirs.filter(t=>t.id!==tirId);setData(d);renderTirSessions();}
+function cancelTirEdit(){editingTirId=null;editingTirLotId=null;document.getElementById('save-tir-btn').textContent='✅ Enregistrer';document.getElementById('tir-edit-banner').style.display='none';renderTirSessions();cibleUpdateSessionBanner();cibleUpdateSessionLabel();}
+function clearTirForm(){cancelTirEdit();['t-date','t-dist','t-temp','t-v0','t-es','t-sd','t-mm','t-moa','t-coups','t-pres','t-notes'].forEach(id=>document.getElementById(id).value='');document.getElementById('t-date').value=new Date().toISOString().slice(0,10);document.getElementById('v0-multi').value='';document.getElementById('v0-stats-result').innerHTML='';document.getElementById('v0-shot-chart-wrap').style.display='none';_v0Stats=null;
+  // Réinitialiser le module cible
+  cibleFullReset();
+  cibleUpdateSessionBanner();cibleUpdateSessionLabel();
+}
+function deleteTir(lotId,tirId){if(!confirm('Supprimer cette session ?'))return;if(editingTirId===tirId)cancelTirEdit();const d=getData(),lot=d.lots.find(l=>l.id===lotId);if(lot)lot.tirs=lot.tirs.filter(t=>t.id!==tirId);setData(d);deletePhoto(tirId);renderTirSessions();renderMaintenanceAlerts();}
 function renderTirSessions(){
   const lotId=fv('tir-lot'),c=document.getElementById('tir-list');
+  cibleUpdateSessionBanner();
   if(!lotId){c.innerHTML='<div class="nd">Sélectionnez un lot.</div>';return;}
   const d=getData(),lot=d.lots.find(l=>l.id===lotId);
   if(!lot||!lot.tirs||!lot.tirs.length){c.innerHTML='<div class="nd">Aucune session pour ce lot.</div>';return;}
@@ -3314,12 +3660,22 @@ function renderTirSessions(){
   if(totalCoups>0){
     coupInfo=`<div class="alert al-s mb">💥 Total coups tirés : <strong>${totalCoups}</strong></div>`;
   }
-  let h=coupInfo+'<div class="ovx"><table><thead><tr><th>Date</th><th>Dist.</th><th>V₀ moy.</th><th>ES</th><th>SD</th><th>Grp mm</th><th>Grp MOA</th><th>°C</th><th>P (mbar)</th><th>Coups</th><th>Notes</th><th></th></tr></thead><tbody>';
-  lot.tirs.forEach(t=>{
+  let h=coupInfo+'<div class="ovx"><table><thead><tr><th style="text-align:center">#</th><th>Date</th><th>Dist.</th><th>V₀ moy.</th><th>ES</th><th>SD</th><th>Grp mm</th><th>Grp MOA</th><th>°C</th><th>P (mbar)</th><th>Coups</th><th>📷</th><th>Notes</th><th></th></tr></thead><tbody>';
+  lot.tirs.forEach((t,idx)=>{
     const esCl=esBadge(t.es),sdCl=sdBadge(t.sd);
     const mCl=t.moa?(t.moa<=1?'bg-gr':t.moa<=1.5?'bg-or':'bg-rd'):'bg-bl';
     const isEd=t.id===editingTirId;
+    // Indicateur cible
+    var cibleCell='<span style="color:#c0d0e0;font-size:11px">—</span>';
+    if(t.cibleData && t.cibleData.nbImpacts > 0) {
+      var coupsOk = (t.coups && t.cibleData.nbImpacts === t.coups);
+      var coupsWarn = (t.coups && t.cibleData.nbImpacts !== t.coups);
+      var esMmLbl = t.cibleData.esMm ? t.cibleData.esMm.toFixed(1)+' mm' : '—';
+      var eMoaLbl = t.cibleData.esMoa ? t.cibleData.esMoa.toFixed(3)+' MOA' : '';
+      cibleCell = '<span class="badge '+(coupsWarn?'bg-or':'bg-gr')+'" style="font-size:10px;cursor:pointer" title="'+t.cibleData.nbImpacts+' impacts · '+esMmLbl+(eMoaLbl?' · '+eMoaLbl:'')+(coupsWarn?' ⚠️ écart coups/impacts':'')+'">📷 '+t.cibleData.nbImpacts+(coupsWarn?' ⚠️':'')+'</span>';
+    }
     h+=`<tr class="clickable${isEd?' editing':''}" onclick="loadTir('${lotId}','${t.id}')">
+      <td style="text-align:center;font-weight:700;color:#2a5a8a;font-size:12px">${idx+1}</td>
       <td>${t.date}${isEd?' <span style="color:#a070e0;font-size:10px">✏️</span>':''}</td>
       <td>${t.dist?t.dist+' m':'—'}</td>
       <td>${t.v0!=null?toDisplayUnit(t.v0).toFixed(1)+' '+unitLabel():'—'}</td>
@@ -3330,6 +3686,7 @@ function renderTirSessions(){
       <td>${t.temp!=null?t.temp+'°':'—'}</td>
       <td>${t.pres!=null?t.pres+' mb':'—'}</td>
       <td>${t.coups!=null?`<span class="badge bg-bl">${t.coups}</span>`:'—'}</td>
+      <td>${cibleCell}</td>
       <td style="max-width:120px;font-size:11px">${t.notes||'—'}</td>
       <td style="white-space:nowrap">
         <button class="btn bs" style="padding:3px 7px;font-size:11px" onclick="event.stopPropagation();printSession('${lotId}','${t.id}')" title="Imprimer cette session">🖨️</button>
@@ -4070,9 +4427,602 @@ function stTouch(e,name,btn){
   showTab(name,btn);
 }
 
+// ========================
+// INDEXEDDB — STOCKAGE PHOTOS CIBLE par session (v9)
+// ========================
+var _photoDB = null;
+var PHOTO_DB_NAME = '308win_photos';
+
+function openPhotoDB() {
+  return new Promise(function(resolve, reject) {
+    if (_photoDB) { resolve(_photoDB); return; }
+    var req = indexedDB.open(PHOTO_DB_NAME, 1);
+    req.onupgradeneeded = function(e) { e.target.result.createObjectStore('photos'); };
+    req.onsuccess = function(e) { _photoDB = e.target.result; resolve(_photoDB); };
+    req.onerror = function() { reject(req.error); };
+  });
+}
+function savePhoto(key, blob) {
+  return openPhotoDB().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction('photos', 'readwrite');
+      tx.objectStore('photos').put(blob, key);
+      tx.oncomplete = resolve; tx.onerror = function() { reject(tx.error); };
+    });
+  });
+}
+function loadPhoto(key) {
+  return openPhotoDB().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction('photos', 'readonly');
+      var req = tx.objectStore('photos').get(key);
+      req.onsuccess = function() { resolve(req.result || null); };
+      req.onerror = function() { reject(req.error); };
+    });
+  });
+}
+function deletePhoto(key) {
+  return openPhotoDB().then(function(db) {
+    return new Promise(function(resolve) {
+      var tx = db.transaction('photos', 'readwrite');
+      tx.objectStore('photos').delete(key);
+      tx.oncomplete = resolve; tx.onerror = resolve;
+    });
+  }).catch(function(){});
+}
+
+// ========================
+// MODULE ANALYSE CIBLE PHOTO — v9
+// ========================
+// ---- Bannière de session active dans la carte cible ----
+function cibleUpdateSessionBanner() {
+  var banner = document.getElementById('cible-session-banner');
+  if (!banner) return;
+  var lotId = fv('tir-lot');
+  if (!lotId) { banner.style.display = 'none'; return; }
+  var d = getData(), lot = d.lots.find(function(l){return l.id===lotId;});
+  if (!lot) { banner.style.display = 'none'; return; }
+  banner.style.display = 'block';
+  if (editingTirId && editingTirLotId === lotId) {
+    var t = lot.tirs.find(function(x){return x.id===editingTirId;});
+    var hasCible = t && t.cibleData && t.cibleData.nbImpacts > 0;
+    banner.className = 'alert ' + (hasCible ? 'al-s' : 'al-e') + ' mb';
+    banner.innerHTML = '🔗 Session en édition : <strong>' + lot.ref + '</strong>'
+      + (t ? ' — ' + t.date : '')
+      + (hasCible
+          ? ' <span style="color:#207040;font-weight:700">📷 Analyse cible enregistrée (' + t.cibleData.nbImpacts + ' impacts)</span>'
+          : ' <span style="color:#a070e0;font-size:11px">— aucune analyse cible liée</span>')
+      + ' <span style="font-size:11px;color:#6080a0">(l\'analyse sera liée automatiquement à l\'enregistrement)</span>';
+  } else {
+    banner.className = 'alert al-i mb';
+    banner.innerHTML = '📦 Lot sélectionné : <strong>' + lot.ref + '</strong>'
+      + ' — Saisissez la session puis <strong>Enregistrer</strong> pour lier l\'analyse cible.';
+  }
+}
+
+// ---- Affichage des résultats enregistrés (sans photo) ----
+function cibleShowStoredResults(cd, coupsSession) {
+  var panel = document.getElementById('cible-stored-results');
+  var grid = document.getElementById('cible-stored-grid');
+  var alertEl = document.getElementById('cible-stored-alert');
+  if (!panel || !grid) return;
+  panel.style.display = 'block';
+  var coupsOk = coupsSession && cd.nbImpacts === parseInt(coupsSession);
+  var coupsWarn = coupsSession && cd.nbImpacts !== parseInt(coupsSession);
+  var dist = parseFloat(document.getElementById('t-dist').value) || 100;
+  var esMoaCalc = (cd.esMm && dist) ? (cd.esMm * 10.8 / (dist * Math.PI)).toFixed(3) : (cd.esMoa ? cd.esMoa.toFixed(3) : null);
+  grid.innerHTML =
+    '<div class="rbox"><div class="rval" style="font-size:20px">' + cd.nbImpacts + '</div><div class="rlbl">Impacts</div></div>'
+    + '<div class="rbox"><div class="rval" style="font-size:20px;color:#c0392b" id="cible-stored-esmm-val">' + (cd.esMm ? cd.esMm.toFixed(1) + ' mm' : '—') + '</div><div class="rlbl">Groupement ES</div></div>'
+    + '<div class="rbox"><div class="rval" style="font-size:20px;color:#2a6090" id="cible-stored-moa-val">' + (esMoaCalc ? esMoaCalc + ' MOA' : '—') + '</div><div class="rlbl">à <span id="cible-stored-dist-lbl">' + dist + '</span> m</div></div>'
+    + '<div class="rbox"><div class="rval" style="font-size:20px;color:#207040">' + (cd.rayonMm ? cd.rayonMm.toFixed(1) + ' mm' : '—') + '</div><div class="rlbl">Rayon MPI max</div></div>';
+  if (coupsWarn) {
+    var diff = Math.abs(cd.nbImpacts - parseInt(coupsSession));
+    var more = cd.nbImpacts > parseInt(coupsSession);
+    alertEl.innerHTML = '<div class="alert ' + (more ? 'al-d' : 'al-w') + '" style="font-size:11px">'
+      + (more ? '🔴' : '⚠️') + ' <strong>' + cd.nbImpacts + ' impact' + (cd.nbImpacts>1?'s':'') + '</strong> enregistrés, '
+      + 'mais <strong>' + coupsSession + ' coup' + (parseInt(coupsSession)>1?'s':'') + ' tirés</strong> dans la session'
+      + ' — écart de <strong>' + diff + ' coup' + (diff>1?'s':'') + '</strong>.</div>';
+  } else {
+    alertEl.innerHTML = coupsOk
+      ? '<div class="alert al-s" style="font-size:11px">✅ Cohérence coups/impacts : ' + cd.nbImpacts + '/' + coupsSession + '</div>'
+      : '';
+  }
+}
+
+// ---- Recalcul MOA à la volée quand la distance change ----
+function cibleRefreshMOA() {
+  var dist = parseFloat(document.getElementById('t-dist').value) || 100;
+  // Panneau live (canevas actif)
+  if (_cbl.impacts && _cbl.impacts.length > 0) {
+    cibleUpdateResults();
+  }
+  // Panneau résultats enregistrés (session éditée, photo non chargée)
+  var panel = document.getElementById('cible-stored-results');
+  if (!panel || panel.style.display === 'none') return;
+  var moaEl = document.getElementById('cible-stored-moa-val');
+  var distEl = document.getElementById('cible-stored-dist-lbl');
+  if (!moaEl) return;
+  // Préférer le recalcul depuis _cbl si l'échelle est disponible
+  var esMm = null;
+  if (_cbl.impacts && _cbl.impacts.length > 0 && _cbl.scalePxPerMm) {
+    var esData = cibleCalcES();
+    if (esData) esMm = esData.dist / _cbl.scalePxPerMm;
+  }
+  // Sinon depuis la session en mémoire (esMm stocké)
+  if (esMm === null && editingTirId && editingTirLotId) {
+    var d = getData();
+    var lot = d.lots.find(function(l){return l.id===editingTirLotId;});
+    if (lot) {
+      var t = lot.tirs.find(function(x){return x.id===editingTirId;});
+      if (t && t.cibleData && t.cibleData.esMm) esMm = t.cibleData.esMm;
+    }
+  }
+  if (esMm !== null) {
+    var esMoa = (esMm * 10.8 / (dist * Math.PI)).toFixed(3);
+    moaEl.textContent = esMoa + ' MOA';
+    if (distEl) distEl.textContent = dist;
+  }
+}
+
+var _cbl = {
+  img: null,
+  mode: 'impact',       // 'calib' | 'impact'
+  calibPts: [],         // 0, 1 ou 2 points de calibration
+  scalePxPerMm: null,   // facteur d'échelle calculé
+  impacts: []           // [{x,y}, ...]
+};
+
+function loadCiblePhoto(evt) {
+  var file = evt.target.files[0];
+  if (!file) return;
+  // Sauvegarder le blob dans IndexedDB avant de lire comme DataURL
+  var photoKey = editingTirId || '_pending';
+  savePhoto(photoKey, file).catch(function(e){ console.warn('Photo IndexedDB save failed:', e); });
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      _cbl.img = img;
+      // Si une session est en édition avec des impacts/calibration déjà restaurés,
+      // les conserver et superposer sur la nouvelle photo — l'utilisateur peut
+      // les effacer manuellement via 🗑 si besoin.
+      var keepState = !!(editingTirId && editingTirLotId && _cbl.impacts && _cbl.impacts.length > 0);
+      if (!keepState) {
+        _cbl.impacts = [];
+        _cbl.calibPts = [];
+        _cbl.scalePxPerMm = null;
+      }
+      var sr=document.getElementById('cible-stored-results');if(sr)sr.style.display='none';
+      document.getElementById('cible-empty-msg').style.display = 'none';
+      document.getElementById('cible-canvas-outer').style.display = 'block';
+      ['btn-cible-calib','btn-cible-impact','btn-cible-undo','btn-cible-clearall'].forEach(function(id){
+        document.getElementById(id).style.display = 'inline-block';
+      });
+      cibleInitCanvas();
+      // Si l'état est conservé : aller directement en mode impact (ne pas réinitialiser calibPts)
+      // Si nouveau départ : aller en mode calibration
+      if (keepState) {
+        // Appel direct sans passer par cibleSetMode('calib') qui effacerait les calibPts
+        _cbl.mode = 'impact';
+        var banner = document.getElementById('cible-mode-banner');
+        var calibRow = document.getElementById('cible-calib-row');
+        var btnC = document.getElementById('btn-cible-calib');
+        var btnI = document.getElementById('btn-cible-impact');
+        if (banner) {
+          banner.style.display = 'block';
+          banner.style.background = '#e8f8ef'; banner.style.border = '1px solid #60c080'; banner.style.color = '#1a6030';
+          banner.textContent = '🎯 Session restaurée — ' + _cbl.impacts.length + ' impact(s) rechargé(s). Clic droit = défaire. MPI en vert, ES en pointillés.';
+        }
+        if (calibRow) calibRow.style.display = 'none';
+        if (btnI) { btnI.style.fontWeight = '700'; btnI.style.background = '#e0f4ea'; }
+        if (btnC) { btnC.style.fontWeight = ''; btnC.style.background = ''; }
+      } else {
+        cibleSetMode('calib');
+      }
+      cibleRedraw();
+      cibleUpdateResults();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function cibleInitCanvas() {
+  var canvas = document.getElementById('cible-canvas');
+  if (canvas._cblInit) return;
+  canvas._cblInit = true;
+  canvas.addEventListener('click', function(e) {
+    if (!_cbl.img) return;
+    var pos = cibleGetPos(canvas, e);
+    cibleHandlePoint(pos);
+  });
+  canvas.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    if (!_cbl.img) return;
+    var touch = e.changedTouches[0];
+    var rect = canvas.getBoundingClientRect();
+    var sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+    cibleHandlePoint({ x: (touch.clientX - rect.left) * sx, y: (touch.clientY - rect.top) * sy });
+  }, { passive: false });
+  canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); cibleUndo(); });
+}
+
+function cibleGetPos(canvas, e) {
+  var rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (canvas.width / rect.width),
+    y: (e.clientY - rect.top) * (canvas.height / rect.height)
+  };
+}
+
+function cibleHandlePoint(pos) {
+  if (_cbl.mode === 'calib') {
+    if (_cbl.calibPts.length < 2) {
+      _cbl.calibPts.push(pos);
+      cibleApplyCalib();
+      cibleRedraw();
+    }
+  } else {
+    _cbl.impacts.push(pos);
+    cibleRedraw();
+    cibleUpdateResults();
+  }
+}
+
+function cibleSetMode(mode) {
+  _cbl.mode = mode;
+  var banner = document.getElementById('cible-mode-banner');
+  var calibRow = document.getElementById('cible-calib-row');
+  var btnC = document.getElementById('btn-cible-calib');
+  var btnI = document.getElementById('btn-cible-impact');
+  banner.style.display = 'block';
+  if (mode === 'calib') {
+    _cbl.calibPts = [];
+    _cbl.scalePxPerMm = null;
+    calibRow.style.display = 'block';
+    banner.style.background = '#fef3e0'; banner.style.border = '1px solid #e8cc88'; banner.style.color = '#b07010';
+    banner.textContent = '📐 Mode CALIBRAGE — Cliquez les points A puis B sur la cible, puis entrez la distance réelle entre eux';
+    btnC.style.fontWeight = '700'; btnC.style.background = '#fef3e0';
+    btnI.style.fontWeight = ''; btnI.style.background = '';
+    cibleUpdateCalibStatus();
+    cibleRedraw();
+    cibleUpdateResults();
+  } else {
+    calibRow.style.display = 'none';
+    banner.style.background = '#e8f8ef'; banner.style.border = '1px solid #60c080'; banner.style.color = '#1a6030';
+    banner.textContent = '🎯 Mode IMPACTS — Cliquez sur chaque trou. Clic droit = défaire. MPI en vert, ES en pointillés.';
+    btnI.style.fontWeight = '700'; btnI.style.background = '#e0f4ea';
+    btnC.style.fontWeight = ''; btnC.style.background = '';
+    cibleUpdateResults();
+  }
+}
+
+function cibleApplyCalib() {
+  var refMm = parseFloat(document.getElementById('cible-ref-mm').value);
+  if (_cbl.calibPts.length === 2 && refMm > 0) {
+    var dx = _cbl.calibPts[0].x - _cbl.calibPts[1].x;
+    var dy = _cbl.calibPts[0].y - _cbl.calibPts[1].y;
+    _cbl.scalePxPerMm = Math.sqrt(dx * dx + dy * dy) / refMm;
+  } else {
+    _cbl.scalePxPerMm = null;
+  }
+  cibleUpdateCalibStatus();
+  cibleRedraw();
+  cibleUpdateResults();
+}
+
+function cibleUpdateCalibStatus() {
+  var el = document.getElementById('cible-calib-status');
+  var n = _cbl.calibPts.length;
+  var refMm = parseFloat(document.getElementById('cible-ref-mm').value);
+  if (n === 0) {
+    el.innerHTML = '<span style="color:#a06010">● Cliquez le point A sur la photo</span>';
+  } else if (n === 1) {
+    el.innerHTML = '<span style="color:#a06010">● A placé — cliquez le point B</span>';
+  } else if (n === 2 && !(refMm > 0)) {
+    el.innerHTML = '<span style="color:#a06010">● A et B placés — entrez la distance réelle (mm)</span>';
+  } else if (n === 2 && refMm > 0 && _cbl.scalePxPerMm) {
+    el.innerHTML = '<span style="color:#207040;font-weight:700">✅ Calibrage OK — ' + _cbl.scalePxPerMm.toFixed(3) + ' px/mm</span><br><a href="#" style="font-size:11px;color:#c0392b" onclick="cibleSetMode(\'impact\');return false">→ Passer aux impacts ▶</a>';
+  }
+}
+
+function cibleUndo() {
+  if (_cbl.mode === 'calib') {
+    _cbl.calibPts.pop();
+    _cbl.scalePxPerMm = null;
+    cibleUpdateCalibStatus();
+    cibleRedraw();
+  } else {
+    if (_cbl.impacts.length > 0) {
+      _cbl.impacts.pop();
+      cibleRedraw();
+      cibleUpdateResults();
+    }
+  }
+}
+
+function cibleClearImpacts() {
+  _cbl.impacts = [];
+  cibleRedraw();
+  cibleUpdateResults();
+}
+
+function cibleRedraw() {
+  var canvas = document.getElementById('cible-canvas');
+  var img = _cbl.img;
+  if (!img) return;
+  var maxW = Math.min(img.width, (window.innerWidth || 640) - 40, 700);
+  canvas.width = maxW;
+  canvas.height = Math.round(img.height * maxW / img.width);
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  // Calibration points
+  for (var i = 0; i < _cbl.calibPts.length; i++) {
+    var cp = _cbl.calibPts[i];
+    ctx.beginPath(); ctx.arc(cp.x, cp.y, 11, 0, 2*Math.PI);
+    ctx.fillStyle = 'rgba(230,160,32,0.28)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cp.x, cp.y, 6, 0, 2*Math.PI);
+    ctx.fillStyle = '#e8a020'; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 9px -apple-system,sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(i === 0 ? 'A' : 'B', cp.x, cp.y);
+  }
+  if (_cbl.calibPts.length === 2) {
+    ctx.beginPath();
+    ctx.moveTo(_cbl.calibPts[0].x, _cbl.calibPts[0].y);
+    ctx.lineTo(_cbl.calibPts[1].x, _cbl.calibPts[1].y);
+    ctx.strokeStyle = '#e8a020'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([5,3]); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // ES line
+  var esData = cibleCalcES();
+  if (esData) {
+    ctx.beginPath();
+    ctx.moveTo(esData.p1.x, esData.p1.y); ctx.lineTo(esData.p2.x, esData.p2.y);
+    ctx.strokeStyle = 'rgba(192,57,43,0.55)'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // MPI crosshair
+  if (_cbl.impacts.length >= 2) {
+    var mpi = cibleCalcMPI();
+    ctx.beginPath(); ctx.arc(mpi.x, mpi.y, 8, 0, 2*Math.PI);
+    ctx.strokeStyle = '#207040'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(mpi.x-11, mpi.y); ctx.lineTo(mpi.x+11, mpi.y);
+    ctx.moveTo(mpi.x, mpi.y-11); ctx.lineTo(mpi.x, mpi.y+11);
+    ctx.strokeStyle = '#207040'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+  // Impacts
+  for (var j = 0; j < _cbl.impacts.length; j++) {
+    var pt = _cbl.impacts[j];
+    ctx.beginPath(); ctx.arc(pt.x, pt.y, 11, 0, 2*Math.PI);
+    ctx.fillStyle = 'rgba(192,57,43,0.2)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(pt.x, pt.y, 6, 0, 2*Math.PI);
+    ctx.fillStyle = '#c0392b'; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 8px -apple-system,sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(j+1, pt.x, pt.y);
+  }
+}
+
+function cibleCalcMPI() {
+  var sx=0, sy=0;
+  for (var i=0; i<_cbl.impacts.length; i++) { sx+=_cbl.impacts[i].x; sy+=_cbl.impacts[i].y; }
+  return { x: sx/_cbl.impacts.length, y: sy/_cbl.impacts.length };
+}
+
+function cibleCalcES() {
+  var pts = _cbl.impacts;
+  if (pts.length < 2) return null;
+  var maxD=0, b1=null, b2=null;
+  for (var i=0; i<pts.length; i++) {
+    for (var j=i+1; j<pts.length; j++) {
+      var dx=pts[i].x-pts[j].x, dy=pts[i].y-pts[j].y;
+      var d=Math.sqrt(dx*dx+dy*dy);
+      if (d>maxD) { maxD=d; b1=pts[i]; b2=pts[j]; }
+    }
+  }
+  return maxD>0 ? {dist:maxD, p1:b1, p2:b2} : null;
+}
+
+function cibleUpdateResults() {
+  var resEl = document.getElementById('cible-result-row');
+  var injEl = document.getElementById('cible-inject-row');
+  var n = _cbl.impacts.length;
+  if (n === 0) { resEl.innerHTML=''; injEl.style.display='none'; return; }
+  var esData = cibleCalcES();
+  var esMm=null, esMoa=null, rayonMm=null;
+  if (esData && _cbl.scalePxPerMm) {
+    esMm = (esData.dist / _cbl.scalePxPerMm).toFixed(1);
+    var dist = parseFloat(document.getElementById('t-dist').value) || 100;
+    esMoa = (parseFloat(esMm) * 10.8 / (dist * Math.PI)).toFixed(3);
+    var mpi = cibleCalcMPI();
+    var maxR=0;
+    for (var i=0; i<_cbl.impacts.length; i++) {
+      var dx=_cbl.impacts[i].x-mpi.x, dy=_cbl.impacts[i].y-mpi.y;
+      var r=Math.sqrt(dx*dx+dy*dy); if(r>maxR)maxR=r;
+    }
+    rayonMm = (maxR / _cbl.scalePxPerMm).toFixed(1);
+  }
+  var noScale = !_cbl.scalePxPerMm ? '<div class="alert al-w" style="font-size:11px;margin-top:8px">⚠️ Calibrez l\'échelle (📐 Calibrer) pour obtenir les mesures en mm.</div>' : '';
+  var dist2 = parseFloat(document.getElementById('t-dist').value)||100;
+  // ---- Alerte écart impacts / coups tirés ----
+  var coupsEl = document.getElementById('t-coups');
+  var coupsVal = coupsEl && coupsEl.value !== '' ? parseInt(coupsEl.value) : NaN;
+  var coupsAlert = '';
+  if (!isNaN(coupsVal) && coupsVal > 0 && n !== coupsVal) {
+    var diff = Math.abs(n - coupsVal);
+    var more = n > coupsVal;
+    coupsAlert = '<div class="alert ' + (more ? 'al-d' : 'al-w') + '" style="font-size:11px;margin-top:8px">'
+      + (more ? '🔴' : '⚠️') + ' <strong>' + n + ' impact' + (n>1?'s':'') + ' placé' + (n>1?'s':'') + '</strong> sur la cible, '
+      + 'mais <strong>' + coupsVal + ' coup' + (coupsVal>1?'s':'') + ' tirés</strong> enregistrés dans la session'
+      + ' — écart de <strong>' + diff + ' coup' + (diff>1?'s':'') + '</strong>.'
+      + (more ? ' Vérifiez les impacts en excès.' : ' Des impacts sont peut-être manquants.')
+      + '</div>';
+  }
+  resEl.innerHTML =
+    '<div style="background:#f0f5fc;border-radius:6px;padding:12px;border:1px solid #c8daea">'
+    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
+    +'<div class="rbox"><div class="rval">'+n+'</div><div class="rlbl">Impacts</div></div>'
+    +'<div class="rbox"><div class="rval" style="color:#c0392b">'+(esMm?esMm+' mm':'—')+'</div><div class="rlbl">Groupement ES</div></div>'
+    +'<div class="rbox"><div class="rval" style="color:#2a6090">'+(esMoa?esMoa+' MOA':'—')+'</div><div class="rlbl">à '+dist2+' m</div></div>'
+    +'</div>'
+    +(rayonMm?'<div style="font-size:11px;color:#6080a0;margin-top:8px;text-align:center">Rayon MPI max : <strong style="color:#207040">'+rayonMm+' mm</strong></div>':'')
+    +coupsAlert
+    +noScale
+    +'</div>';
+  injEl.style.display = (esMm && parseFloat(esMm)>0) ? 'block' : 'none';
+}
+
+function cibleInjectGroupement() {
+  var esData = cibleCalcES();
+  if (!esData || !_cbl.scalePxPerMm) return;
+  var esMm = (esData.dist / _cbl.scalePxPerMm).toFixed(1);
+  var field = document.getElementById('t-mm');
+  field.value = esMm;
+  calcMOA();
+  field.scrollIntoView({ behavior:'smooth', block:'center' });
+  field.style.transition = 'background .3s';
+  field.style.background = '#c8ecd4';
+  setTimeout(function(){ field.style.background=''; field.style.transition=''; }, 2000);
+}
+// ---- Label lot+session au-dessus de la cible ----
+function cibleUpdateSessionLabel() {
+  var lbl = document.getElementById('cible-session-label');
+  if (!lbl) return;
+  if (!editingTirId || !editingTirLotId) { lbl.style.display = 'none'; return; }
+  var d = getData();
+  var lot = d.lots.find(function(l){ return l.id === editingTirLotId; });
+  if (!lot) { lbl.style.display = 'none'; return; }
+  var t = lot.tirs.find(function(x){ return x.id === editingTirId; });
+  lbl.style.display = 'flex';
+  document.getElementById('csl-lot').textContent = lot.ref;
+  document.getElementById('csl-date').textContent = t ? t.date : '—';
+  document.getElementById('csl-dist').textContent = (t && t.dist) ? t.dist + ' m' : '—';
+}
+
+// ---- Alertes maintenance ----
+var MNTKEY = '308win_maintenance';
+function getMaintenance() { try { return JSON.parse(localStorage.getItem(MNTKEY)) || { last200: 0, last1000: 0, log: [] }; } catch(e) { return { last200: 0, last1000: 0, log: [] }; } }
+function setMaintenance(m) { localStorage.setItem(MNTKEY, JSON.stringify(m)); }
+
+function renderMaintenanceAlerts() {
+  var d = getData();
+  var grandTotal = d.lots.reduce(function(sum, l){ return (l.tirs||[]).reduce(function(a,t){ return a+(t.coups||0); }, 0)+sum; }, 0);
+  var m = getMaintenance();
+
+  // Bannière dans l'onglet Tir
+  var banner = document.getElementById('maintenance-banner');
+  if (banner) {
+    var alerts = [];
+    var due200 = grandTotal - m.last200 >= 200;
+    var due1000 = grandTotal - m.last1000 >= 1000;
+    var warn200 = !due200 && (grandTotal % 200 >= 180); // dans les 20 derniers coups
+    var warn1000 = !due1000 && (grandTotal % 1000 >= 970);
+    if (due200) {
+      var overdue = grandTotal - m.last200;
+      alerts.push('<div class="alert al-w" style="margin-bottom:6px">🔧 <strong>Maintenance 200 tirs due</strong> ('+overdue+' coups depuis dernier entretien) — Canon désencuivrage · Silencieux Guntec · Vis pontet 3,4 N·m · Colliers 2,0 N·m &nbsp;<button class="btn bs" style="padding:2px 10px;font-size:11px" onclick="ackMaintenance(200)">✓ Effectuée</button></div>');
+    } else if (warn200) {
+      alerts.push('<div class="alert al-i" style="margin-bottom:6px">ℹ️ Maintenance 200 tirs dans <strong>'+(200-(grandTotal%200))+' coups</strong> (canon / silencieux / colliers).</div>');
+    }
+    if (due1000) {
+      var overdue1k = grandTotal - m.last1000;
+      alerts.push('<div class="alert al-d" style="margin-bottom:6px">🔴 <strong>Maintenance 1000 tirs due</strong> ('+overdue1k+' coups depuis dernier entretien) — Percuteur · Bouche du canon &nbsp;<button class="btn bs" style="padding:2px 10px;font-size:11px" onclick="ackMaintenance(1000)">✓ Effectuée</button></div>');
+    } else if (warn1000) {
+      alerts.push('<div class="alert al-i" style="margin-bottom:6px">ℹ️ Maintenance 1000 tirs dans <strong>'+(1000-(grandTotal%1000))+' coups</strong> (percuteur / couronne).</div>');
+    }
+    banner.innerHTML = alerts.join('');
+  }
+
+  // Compteur dans l'onglet Entretien
+  var grid = document.getElementById('entretien-counter-grid');
+  if (grid) {
+    var next200 = 200 - (grandTotal % 200);
+    var next1000 = 1000 - (grandTotal % 1000);
+    var col200 = (grandTotal - m.last200 >= 200) ? '#c0392b' : (next200 <= 20 ? '#b07010' : '#207040');
+    var col1000 = (grandTotal - m.last1000 >= 1000) ? '#c0392b' : (next1000 <= 30 ? '#b07010' : '#207040');
+    grid.innerHTML =
+      '<div class="rbox"><div class="rval" style="font-size:24px">' + grandTotal + '</div><div class="rlbl">💥 Coups totaux</div></div>'
+      + '<div class="rbox"><div class="rval" style="font-size:24px;color:' + col200 + '">' + next200 + '</div><div class="rlbl">🔧 Avant entretien 200</div></div>'
+      + '<div class="rbox"><div class="rval" style="font-size:24px;color:' + col1000 + '">' + next1000 + '</div><div class="rlbl">🔴 Avant entretien 1000</div></div>';
+    var dueAlerts = document.getElementById('entretien-due-alerts');
+    if (dueAlerts) {
+      var da = [];
+      if (grandTotal - m.last200 >= 200) da.push('<div class="alert al-w">🔧 <strong>Entretien 200 tirs dû</strong> — '+(grandTotal-m.last200)+' coups depuis dernier entretien. <button class="btn bs" style="padding:2px 10px;font-size:11px" onclick="ackMaintenance(200)">✓ Effectuée</button></div>');
+      if (grandTotal - m.last1000 >= 1000) da.push('<div class="alert al-d">🔴 <strong>Entretien 1000 tirs dû</strong> — '+(grandTotal-m.last1000)+' coups depuis dernier entretien. <button class="btn bs" style="padding:2px 10px;font-size:11px" onclick="ackMaintenance(1000)">✓ Effectuée</button></div>');
+      if (!da.length) da.push('<div class="alert al-s">✅ Aucune maintenance périodique en attente.</div>');
+      dueAlerts.innerHTML = da.join('');
+    }
+  }
+  renderMaintenanceLog();
+}
+
+function ackMaintenance(seuil) {
+  var d = getData();
+  var grandTotal = d.lots.reduce(function(sum, l){ return (l.tirs||[]).reduce(function(a,t){ return a+(t.coups||0); }, 0)+sum; }, 0);
+  var m = getMaintenance();
+  if (seuil === 200) m.last200 = grandTotal;
+  if (seuil === 1000) m.last1000 = grandTotal;
+  // Ajouter au journal automatiquement
+  if (!m.log) m.log = [];
+  m.log.unshift({ date: new Date().toISOString().slice(0,10), type: seuil+'tirs', coups: grandTotal, notes: 'Accusé de réception automatique via alerte.' });
+  setMaintenance(m);
+  renderMaintenanceAlerts();
+}
+
+// ---- Journal de maintenance ----
+var MNT_TYPES = { '200tirs': '200 tirs — Canon/Silencieux/Vis/Colliers', '1000tirs': '1000 tirs — Percuteur/Bouche canon', 'seance': 'Fin de séance — Nettoyage', 'optique': 'Optique/Colliers', 'autre': 'Autre' };
+function saveMaintenance() {
+  var m = getMaintenance();
+  if (!m.log) m.log = [];
+  var entry = {
+    id: uid(),
+    date: document.getElementById('mnt-date').value || new Date().toISOString().slice(0,10),
+    type: document.getElementById('mnt-type').value,
+    coups: parseInt(document.getElementById('mnt-coups').value) || null,
+    notes: document.getElementById('mnt-notes').value
+  };
+  m.log.unshift(entry);
+  setMaintenance(m);
+  clearMaintenanceForm();
+  renderMaintenanceAlerts();
+}
+function clearMaintenanceForm() {
+  document.getElementById('mnt-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('mnt-coups').value = '';
+  document.getElementById('mnt-notes').value = '';
+}
+function deleteMaintenance(id) {
+  var m = getMaintenance();
+  m.log = (m.log||[]).filter(function(e){ return e.id !== id; });
+  setMaintenance(m);
+  renderMaintenanceAlerts();
+}
+function renderMaintenanceLog() {
+  var el = document.getElementById('mnt-list');
+  if (!el) return;
+  var m = getMaintenance();
+  var log = m.log || [];
+  if (!log.length) { el.innerHTML = '<div class="nd">Aucune opération enregistrée.</div>'; return; }
+  var h = '<div class="ovx"><table><thead><tr><th>Date</th><th>Type</th><th>Coups</th><th>Notes</th><th></th></tr></thead><tbody>';
+  log.forEach(function(e) {
+    h += '<tr><td>' + e.date + '</td><td>' + (MNT_TYPES[e.type] || e.type) + '</td><td>' + (e.coups != null ? e.coups : '—') + '</td><td style="font-size:11px;max-width:200px">' + (e.notes || '—') + '</td>'
+      + '<td><button class="btn bd" style="padding:2px 8px;font-size:11px" onclick="deleteMaintenance(\'' + e.id + '\')">✕</button></td></tr>';
+  });
+  el.innerHTML = h + '</tbody></table></div>';
+}
+
+// ========================
+// FIN MODULE ANALYSE CIBLE PHOTO — v9
+// ========================
+
 // ---- VERSION ----
-var APP_VERSION='8.11';
-var APP_DATE='2026-05-10';
+var APP_VERSION='9.3';
+var APP_DATE='2026-05-12';
 var UPDATE_URL_KEY='308win_update_url';
 
 function initVersionDisplay(){
@@ -4132,10 +5082,12 @@ function checkUpdate(silent){
 // ---- INIT ----
 document.getElementById('l-date').value=new Date().toISOString().slice(0,10);
 document.getElementById('t-date').value=new Date().toISOString().slice(0,10);
+document.getElementById('mnt-date').value=new Date().toISOString().slice(0,10);
 // loadSettings() restaure aussi la préférence d'unité (F-05)
 renderLots();loadTourelle();loadArme();loadSettings();renderExpStats();renderArmes();
 renderAllWithUnit(); // C-2 : met à jour les labels V₀/ES/SD selon l'unité restaurée
 initVersionDisplay();
+renderMaintenanceAlerts();
 
 
 </script>
