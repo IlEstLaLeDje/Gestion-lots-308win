@@ -3413,7 +3413,18 @@ function loadLot(id){
 }
 function cancelLotEdit(){editingLotId=null;document.getElementById('save-lot-btn').textContent='✅ Enregistrer';document.getElementById('lot-edit-banner').style.display='none';renderLots();}
 function clearLotForm(){cancelLotEdit();['l-ref','l-date','l-etui','l-amorce','l-poudre','l-charge','l-proj','l-masse','l-cbto','l-coal','l-jump','l-sbump','l-recuits','l-recharges','l-bc','l-bc-g7','l-long-ogive','l-notes'].forEach(id=>document.getElementById(id).value='');document.getElementById('l-date').value=new Date().toISOString().slice(0,10);const sr=document.getElementById('stab-result');if(sr)sr.style.display='none';}
-function deleteLot(id){if(!confirm('Supprimer ce lot ?'))return;if(editingLotId===id)cancelLotEdit();const d=getData();d.lots=d.lots.filter(l=>l.id!==id);setData(d);renderLots();}
+function deleteLot(id){
+  if(!confirm('Supprimer ce lot ?'))return;
+  if(editingLotId===id)cancelLotEdit();
+  const d=getData();
+  // Nettoyage IndexedDB : supprimer les photos de toutes les sessions du lot avant de l'effacer
+  const lot=d.lots.find(l=>l.id===id);
+  if(lot&&lot.tirs&&lot.tirs.length){
+    lot.tirs.forEach(function(t){deletePhoto(t.id).catch(function(){});});
+  }
+  d.lots=d.lots.filter(l=>l.id!==id);
+  setData(d);renderLots();
+}
 function duplicateLot(id){
   const d=getData(),l=d.lots.find(x=>x.id===id);if(!l)return;
   const newLot={...l,id:uid(),ref:l.ref+'-COPY',tirs:[]};
@@ -4131,7 +4142,15 @@ function importJSON(ev){
   };
   r.readAsText(f);
 }
-function clearAll(){if(!confirm('⚠️ SUPPRIMER toutes les données ?'))return;localStorage.removeItem(KEY);localStorage.removeItem(TKEY);renderLots();renderExpStats();alert('Données effacées.');}
+function clearAll(){
+  if(!confirm('⚠️ SUPPRIMER toutes les données ? Lots, sessions, photos, profil arme, lunette et paramètres seront effacés.'))return;
+  // Supprimer toutes les clés localStorage
+  [KEY,TKEY,SKEY,UKEY,AKEY,ARMESKEY].forEach(function(k){localStorage.removeItem(k);});
+  // Vider la base IndexedDB des photos
+  try{indexedDB.deleteDatabase(PHOTO_DB_NAME);}catch(e){}
+  renderLots();renderExpStats();
+  alert('Données effacées (lots, sessions, photos, profil arme, lunette, paramètres).');
+}
 function renderPerLotExport(){
   const d=getData(),c=document.getElementById('per-lot-export');
   if(!d.lots.length){c.innerHTML='';return;}
@@ -5025,8 +5044,8 @@ function renderMaintenanceLog() {
 // ========================
 
 // ---- VERSION ----
-var APP_VERSION='9.3';
-var APP_DATE='2026-05-12';
+var APP_VERSION='9.4';
+var APP_DATE='2026-05-13';
 var UPDATE_URL_KEY='308win_update_url';
 
 function initVersionDisplay(){
