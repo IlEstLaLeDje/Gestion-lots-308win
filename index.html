@@ -2989,12 +2989,16 @@ function parseQuantumCSV(ev){
     for(let i=1;i<lines.length;i++){
       const cols=lines[i].split(',');
       const fps=parseFloat(cols[velIdx]);
-      if(!isNaN(fps)&&fps>0)vals.push((fps*0.3048).toFixed(1));
+      if(!isNaN(fps)&&fps>0){
+        // F-05/BUG-02 : injecter dans l'unité active (fps×1 ou fps×0.3048) — calcV0Stats() fera fromDisplayUnit()
+        const val = getUnit()==='fps' ? fps : (fps*0.3048).toFixed(1);
+        vals.push(val);
+      }
     }
     if(!vals.length){showQuantumError('Aucune valeur valide trouvée.');return;}
     document.getElementById('v0-multi').value=vals.join('\n');
     const st=document.getElementById('quantum-status');
-    st.textContent=`✅ ${vals.length} coups importés (fps→m/s) — ${f.name}`;
+    st.textContent=`✅ ${vals.length} coups importés — ${f.name}`;
     st.style.color='#207040';
     calcV0Stats();
     ev.target.value='';
