@@ -3113,7 +3113,7 @@ function showTab(name,btn){
 function refreshLotSel(selId,filterBal=false){
   const sel=document.getElementById(selId),cur=sel.value,d=getData();
   sel.innerHTML='<option value="">— '+(filterBal?'Saisie manuelle':'Sélectionner un lot')+' —</option>';
-  d.lots.forEach(l=>{if(filterBal&&!((l.bc||l.bcG7)&&l.masse))return;sel.innerHTML+=`<option value="${l.id}" ${l.id===cur?'selected':''}>${l.ref} (${l.date})</option>`;});
+  d.lots.forEach(l=>{if(filterBal&&!((l.bc||l.bcG7)&&l.masse))return;sel.innerHTML+=`<option value="${l.id}" ${l.id===cur?'selected':''}>${esc(l.ref)} (${esc(l.date)})</option>`;});
   if(selId==='tir-lot'&&cur)renderTirSessions();
 }
 // ---- ARME ----
@@ -3245,11 +3245,11 @@ function renderArmes(){
   armes.forEach(a=>{
     const active=a.id===activeId;
     h+=`<tr class="clickable${active?' editing':''}" onclick="loadArmeProfile('${a.id}')" title="Charger ce profil">
-      <td><strong>${a.nom||'—'}</strong>${active?' <span class="badge bg-gr" style="font-size:10px;vertical-align:middle">actif</span>':''}</td>
+      <td><strong>${esc(a.nom||'—')}</strong>${active?' <span class="badge bg-gr" style="font-size:10px;vertical-align:middle">actif</span>':''}</td>
       <td>${pasLabel(a.pas)}</td>
       <td>${a.long||'—'}</td>
       <td>${a.longChargeur?a.longChargeur+' mm':'—'}</td>
-      <td>${a.trModel||'—'}</td>
+      <td>${esc(a.trModel||'—')}</td>
       <td>${a.trClicsPerMoa||'—'}</td>
       <td>${a.scopeH||'—'}</td>
       <td style="text-align:right"><button class="btn bd" style="padding:3px 9px;font-size:11px" title="Supprimer ce profil" onclick="deleteArmeProfile('${a.id}',event)">🗑</button></td>
@@ -3275,7 +3275,7 @@ function loadArme(){
         document.getElementById('arme-new-btn').style.display='';
       }
     }
-  }catch(e){}
+  }catch(e){console.error(e);}
 }
 function getArmePas(){return parseFloat(document.getElementById('arme-pas').value)||0;}
 
@@ -3380,7 +3380,7 @@ function loadTourelle(){
       if(t.total&&!t.totalV)document.getElementById('tr-total-v').value=t.total;
       if(t.zero!=null&&t.zeroV==null)document.getElementById('tr-zero-v').value=t.zero;
     }
-  }catch(e){}
+  }catch(e){console.error(e);}
 }
 function getTourelleState(){const total=fn('tr-total-v')||240,zero=fn('tr-zero-v');return{total,zero,position:zero!=null?zero:null};}
 function updateTourelleDisplay(){}
@@ -3420,7 +3420,7 @@ function deleteLot(id){
   // Nettoyage IndexedDB : supprimer les photos de toutes les sessions du lot avant de l'effacer
   const lot=d.lots.find(l=>l.id===id);
   if(lot&&lot.tirs&&lot.tirs.length){
-    lot.tirs.forEach(function(t){deletePhoto(t.id).catch(function(){});});
+    lot.tirs.forEach(function(t){deletePhoto(t.id).catch(function(e){console.error(e);});});
   }
   d.lots=d.lots.filter(l=>l.id!==id);
   setData(d);renderLots();
@@ -3461,11 +3461,11 @@ function renderLots(){
       coupsCell=`<span class="badge bg-gr" style="font-size:12px;font-weight:700">${totalCoups}</span>`;
     }else{coupsCell='<span style="color:#b0c0d0">—</span>';}
     h+=`<tr class="clickable${isEd?' editing':''}" onclick="loadLot('${l.id}')">
-      <td><strong>${l.ref}</strong>${isEd?' <span style="color:#a070e0;font-size:10px">✏️</span>':''}</td>
-      <td>${l.date}</td><td>${l.poudre||'—'}</td><td>${l.charge?l.charge+' gr':'—'}</td>
-      <td style="max-width:160px">${l.proj?l.proj.slice(0,26):'—'}</td>
+      <td><strong>${esc(l.ref)}</strong>${isEd?' <span style="color:#a070e0;font-size:10px">✏️</span>':''}</td>
+      <td>${esc(l.date)}</td><td>${esc(l.poudre||'—')}</td><td>${l.charge?l.charge+' gr':'—'}</td>
+      <td style="max-width:160px">${esc(l.proj?l.proj.slice(0,26):'—')}</td>
       <td>${l.cbto?l.cbto+' mm':'—'}</td><td>${l.jump?l.jump+' mm':'—'}</td>
-      <td>${l.sbump!=null?l.sbump.toFixed(3)+' mm':'—'}</td><td>${l.bc||'—'}</td><td>${l.bcG7||'—'}</td>
+      <td>${l.sbump!=null?l.sbump.toFixed(3)+' mm':'—'}</td><td>${esc(l.bc||'—')}</td><td>${esc(l.bcG7||'—')}</td>
       <td><span class="badge bg-bl">${(l.tirs||[]).length}</span></td>
       <td>${coupsCell}</td>
       <td style="white-space:nowrap">
@@ -3526,7 +3526,7 @@ function saveTir(){
   else {
     const nEntry={id:uid(),...f};if(cibleToSave!==null)nEntry.cibleData=cibleToSave;lot.tirs.push(nEntry);
     // Déplacer la photo _pending vers l'ID définitif
-    loadPhoto('_pending').then(function(blob){ if(blob){savePhoto(nEntry.id,blob).then(function(){deletePhoto('_pending');});} }).catch(function(){});
+    loadPhoto('_pending').then(function(blob){ if(blob){savePhoto(nEntry.id,blob).then(function(){deletePhoto('_pending');});} }).catch(function(e){console.error(e);});
   }
   setData(d);document.getElementById('t-date').value=new Date().toISOString().slice(0,10);renderTirSessions();cibleUpdateSessionBanner();cibleUpdateSessionLabel();renderMaintenanceAlerts();
 }
@@ -3647,7 +3647,7 @@ function loadTir(lotId,tirId){
       };
       img.onerror = function() {}; // blob invalide — on reste sur le panneau stocké
       img.src = url;
-    }).catch(function(){});
+    }).catch(function(e){console.error(e);});
   } else {
     _cbl.impacts = []; _cbl.calibPts = []; _cbl.scalePxPerMm = null; _cbl.img = null;
     var sr=document.getElementById('cible-stored-results');if(sr)sr.style.display='none';
@@ -3691,7 +3691,7 @@ function renderTirSessions(){
     }
     h+=`<tr class="clickable${isEd?' editing':''}" onclick="loadTir('${lotId}','${t.id}')">
       <td style="text-align:center;font-weight:700;color:#2a5a8a;font-size:12px">${idx+1}</td>
-      <td>${t.date}${isEd?' <span style="color:#a070e0;font-size:10px">✏️</span>':''}</td>
+      <td>${esc(t.date)}${isEd?' <span style="color:#a070e0;font-size:10px">✏️</span>':''}</td>
       <td>${t.dist?t.dist+' m':'—'}</td>
       <td>${t.v0!=null?toDisplayUnit(t.v0).toFixed(1)+' '+unitLabel():'—'}</td>
       <td>${t.es!=null?`<span class="badge ${esCl}">${toDisplayUnit(t.es).toFixed(1)}</span>`:'—'}</td>
@@ -3702,7 +3702,7 @@ function renderTirSessions(){
       <td>${t.pres!=null?t.pres+' mb':'—'}</td>
       <td>${t.coups!=null?`<span class="badge bg-bl">${t.coups}</span>`:'—'}</td>
       <td>${cibleCell}</td>
-      <td style="max-width:120px;font-size:11px">${t.notes||'—'}</td>
+      <td style="max-width:120px;font-size:11px">${esc(t.notes||'—')}</td>
       <td style="white-space:nowrap">
         <button class="btn bs" style="padding:3px 7px;font-size:11px" onclick="event.stopPropagation();printSession('${lotId}','${t.id}')" title="Imprimer cette session">🖨️</button>
         <button class="btn bd" style="padding:3px 9px;font-size:11px;margin-left:2px" onclick="event.stopPropagation();deleteTir('${lotId}','${t.id}')">✕</button>
@@ -3731,16 +3731,16 @@ function refreshAnalyse(){
     let score=null,scCl='';
     if(gmo!=null&&sdm!=null){score=Math.max(0,Math.round(100-gmo*40-sdm*4));scCl=score>=70?'bg-gr':score>=50?'bg-or':'bg-rd';}
     let al='';if(esm>s.esOr)al+='⚠️ ES élevé ';if(sdm>s.sdOr)al+='⚠️ SD élevé ';if(gmo>1.5)al+='⚠️ Grp > 1.5 MOA ';
-    h+=`<tr><td><strong>${l.ref}</strong><br><span style="font-size:10px;color:#6080a0">${l.poudre||''}</span></td><td>${l.charge?l.charge+' gr':'—'}</td><td>${l.jump?l.jump+' mm':'—'}</td><td>${l.sbump!=null?l.sbump.toFixed(3)+' mm':'—'}</td><td>${n}</td><td>${v0m?toDisplayUnit(v0m).toFixed(1)+' '+unitLabel():'—'}</td><td>${esm?toDisplayUnit(esm).toFixed(1):'—'}</td><td>${sdm?toDisplayUnit(sdm).toFixed(2):'—'}</td><td>${gmm?gmm.toFixed(1):'—'}</td><td>${gmo?gmo.toFixed(3):'—'}</td><td>${score!=null?`<span class="badge ${scCl}">${score}/100</span>`:'—'}</td><td style="font-size:11px">${al||'<span style="color:#207040;font-weight:600">✓ OK</span>'}</td></tr>`;
+    h+=`<tr><td><strong>${esc(l.ref)}</strong><br><span style="font-size:10px;color:#6080a0">${l.poudre||''}</span></td><td>${l.charge?l.charge+' gr':'—'}</td><td>${l.jump?l.jump+' mm':'—'}</td><td>${l.sbump!=null?l.sbump.toFixed(3)+' mm':'—'}</td><td>${n}</td><td>${v0m?toDisplayUnit(v0m).toFixed(1)+' '+unitLabel():'—'}</td><td>${esm?toDisplayUnit(esm).toFixed(1):'—'}</td><td>${sdm?toDisplayUnit(sdm).toFixed(2):'—'}</td><td>${gmm?gmm.toFixed(1):'—'}</td><td>${gmo?gmo.toFixed(3):'—'}</td><td>${score!=null?`<span class="badge ${scCl}">${score}/100</span>`:'—'}</td><td style="font-size:11px">${al||'<span style="color:#207040;font-weight:600">✓ OK</span>'}</td></tr>`;
   });
   h+='</tbody></table></div>';
   d.lots.forEach(l=>{
     const tr=l.tirs||[];if(!tr.length)return;
-    h+=`<div style="margin-top:18px"><div style="font-size:13px;font-weight:700;color:#2a6090;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #d0dce8">📋 Sessions — <span style="color:#c0392b">${l.ref}</span><span style="font-size:11px;color:#6080a0;font-weight:400;margin-left:10px">${l.poudre||''} ${l.charge?'/ '+l.charge+' gr':''}</span></div><div class="ovx"><table><thead><tr><th>#</th><th>Date</th><th>Dist.</th><th>V₀ moy.</th><th>ES</th><th>SD</th><th>Grp mm</th><th>Grp MOA</th><th>°C</th><th>Notes</th></tr></thead><tbody>`;
+    h+=`<div style="margin-top:18px"><div style="font-size:13px;font-weight:700;color:#2a6090;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #d0dce8">📋 Sessions — <span style="color:#c0392b">${esc(l.ref)}</span><span style="font-size:11px;color:#6080a0;font-weight:400;margin-left:10px">${l.poudre||''} ${l.charge?'/ '+l.charge+' gr':''}</span></div><div class="ovx"><table><thead><tr><th>#</th><th>Date</th><th>Dist.</th><th>V₀ moy.</th><th>ES</th><th>SD</th><th>Grp mm</th><th>Grp MOA</th><th>°C</th><th>Notes</th></tr></thead><tbody>`;
     tr.forEach((t,i)=>{
       const esCl=esBadge(t.es),sdCl=sdBadge(t.sd);
       const mCl=t.moa?(t.moa<=1?'bg-gr':t.moa<=1.5?'bg-or':'bg-rd'):'bg-bl';
-      h+=`<tr><td style="color:#506080">${i+1}</td><td>${t.date}</td><td>${t.dist?t.dist+' m':'—'}</td><td>${t.v0||'—'}</td><td>${t.es!=null?`<span class="badge ${esCl}">${t.es}</span>`:'—'}</td><td>${t.sd!=null?`<span class="badge ${sdCl}">${t.sd}</span>`:'—'}</td><td>${t.mm||'—'}</td><td>${t.moa!=null?`<span class="badge ${mCl}">${t.moa}</span>`:'—'}</td><td>${t.temp!=null?t.temp+'°':'—'}</td><td style="max-width:140px;font-size:11px">${t.notes||'—'}</td></tr>`;
+      h+=`<tr><td style="color:#506080">${i+1}</td><td>${esc(t.date)}</td><td>${t.dist?t.dist+' m':'—'}</td><td>${t.v0||'—'}</td><td>${t.es!=null?`<span class="badge ${esCl}">${t.es}</span>`:'—'}</td><td>${t.sd!=null?`<span class="badge ${sdCl}">${t.sd}</span>`:'—'}</td><td>${t.mm||'—'}</td><td>${t.moa!=null?`<span class="badge ${mCl}">${t.moa}</span>`:'—'}</td><td>${t.temp!=null?t.temp+'°':'—'}</td><td style="max-width:140px;font-size:11px">${esc(t.notes||'—')}</td></tr>`;
     });
     const v0m=avg(tr,'v0'),esm=avg(tr,'es'),sdm=avg(tr,'sd'),gmm=avg(tr,'mm'),gmo=avg(tr,'moa');
     h+=`<tr style="background:#f0f5fc;font-style:italic;color:#6080a8"><td colspan="3" style="font-size:11px;color:#6080a0">Moyennes</td><td>${v0m?toDisplayUnit(v0m).toFixed(1)+' '+unitLabel():'—'}</td><td>${esm?toDisplayUnit(esm).toFixed(1):'—'}</td><td>${sdm?toDisplayUnit(sdm).toFixed(2):'—'}</td><td>${gmm?gmm.toFixed(1):'—'}</td><td>${gmo?gmo.toFixed(3):'—'}</td><td colspan="2"></td></tr></tbody></table></div></div>`;
@@ -4042,7 +4042,7 @@ function printLabel(id){
   const row=(lbl,val)=>`<tr><td style="font-weight:700;white-space:nowrap;padding:2px 4px">${lbl}:</td><td style="border:1px solid #000;min-width:140px;padding:2px 5px;font-size:11px">${val||''}</td></tr>`;
   const rowR=(lbl,val)=>`<tr><td style="font-weight:700;white-space:nowrap;padding:2px 4px">${lbl}:</td><td style="border:1px solid #000;min-width:52px;padding:2px 5px;font-size:11px">${val||''}</td></tr>`;
   const cells=(from,to)=>Array.from({length:to-from+1},(_,i)=>`<td style="border:1px solid #000;width:${100/(to-from+1)}%;text-align:center;padding:5px 2px;font-size:11px">${from+i}</td>`).join('');
-  const html=`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Étiquette ${l.ref}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:12px;background:#fff;color:#000}@media print{body{padding:0}button{display:none!important}@page{margin:8mm}}</style></head><body><div style="border:2px solid #000;width:100%;max-width:620px;margin:0 auto"><div style="display:flex;align-items:center;border-bottom:2px solid #000;padding:5px 10px;gap:20px"><strong style="font-size:15px;white-space:nowrap">.308 Win</strong><span style="flex:1;text-align:center;font-size:13px">LOT :&nbsp;<strong>${l.ref}</strong></span><span style="font-size:13px;white-space:nowrap">DATE :&nbsp;<strong>${dateF}</strong></span></div><div style="display:flex;border-bottom:1px solid #000"><div style="flex:1.6;padding:6px 10px;border-right:1px solid #000"><div style="font-weight:700;font-size:12px;margin-bottom:4px">COMPOSANTS</div><table style="width:100%;border-collapse:collapse">${row('ETUIS',l.etui)}${row('AMORCE',l.amorce)}${row('POUDRE',l.poudre)}${row('CHARGE',l.charge?l.charge+' gr':'')}${row('OGIVE',l.proj)}${row('POIDS',l.masse?l.masse+' gr':'')}</table></div><div style="flex:1;padding:6px 10px"><div style="font-weight:700;font-size:12px;margin-bottom:4px">REGLAGES</div><table style="width:100%;border-collapse:collapse">${rowR('CBTO',l.cbto?l.cbto+' mm':'')}${rowR('JUMP',l.jump?l.jump+' mm':'')}${rowR('BUMP',l.sbump!=null?l.sbump.toFixed(3)+' mm':'')}${rowR('RECUIT',l.recuits!=null?l.recuits:'')}${rowR('SESSIONS',totalSessions)}${rowR('COUPS',totalCoups||'')}</table></div></div><div style="border-bottom:1px solid #000;padding:5px 10px"><div style="font-weight:700;font-size:11px;margin-bottom:4px">RECHARG. ÉTUIS (1-10)</div><table style="width:100%;border-collapse:collapse"><tr>${cells(1,10)}</tr></table></div><div style="padding:5px 10px"><div style="font-weight:700;font-size:11px;margin-bottom:4px">ÉTAPES (0-12)</div><table style="width:100%;border-collapse:collapse"><tr>${cells(0,12)}</tr></table></div></div><div style="text-align:center;margin-top:10px"><button onclick="window.print()" style="padding:6px 20px;font-size:13px;cursor:pointer">🖨 Imprimer</button></div></body></html>`;
+  const html=`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Étiquette ${esc(l.ref)}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:12px;background:#fff;color:#000}@media print{body{padding:0}button{display:none!important}@page{margin:8mm}}</style></head><body><div style="border:2px solid #000;width:100%;max-width:620px;margin:0 auto"><div style="display:flex;align-items:center;border-bottom:2px solid #000;padding:5px 10px;gap:20px"><strong style="font-size:15px;white-space:nowrap">.308 Win</strong><span style="flex:1;text-align:center;font-size:13px">LOT :&nbsp;<strong>${esc(l.ref)}</strong></span><span style="font-size:13px;white-space:nowrap">DATE :&nbsp;<strong>${dateF}</strong></span></div><div style="display:flex;border-bottom:1px solid #000"><div style="flex:1.6;padding:6px 10px;border-right:1px solid #000"><div style="font-weight:700;font-size:12px;margin-bottom:4px">COMPOSANTS</div><table style="width:100%;border-collapse:collapse">${row('ETUIS',l.etui)}${row('AMORCE',l.amorce)}${row('POUDRE',l.poudre)}${row('CHARGE',l.charge?l.charge+' gr':'')}${row('OGIVE',l.proj)}${row('POIDS',l.masse?l.masse+' gr':'')}</table></div><div style="flex:1;padding:6px 10px"><div style="font-weight:700;font-size:12px;margin-bottom:4px">REGLAGES</div><table style="width:100%;border-collapse:collapse">${rowR('CBTO',l.cbto?l.cbto+' mm':'')}${rowR('JUMP',l.jump?l.jump+' mm':'')}${rowR('BUMP',l.sbump!=null?l.sbump.toFixed(3)+' mm':'')}${rowR('RECUIT',l.recuits!=null?l.recuits:'')}${rowR('SESSIONS',totalSessions)}${rowR('COUPS',totalCoups||'')}</table></div></div><div style="border-bottom:1px solid #000;padding:5px 10px"><div style="font-weight:700;font-size:11px;margin-bottom:4px">RECHARG. ÉTUIS (1-10)</div><table style="width:100%;border-collapse:collapse"><tr>${cells(1,10)}</tr></table></div><div style="padding:5px 10px"><div style="font-weight:700;font-size:11px;margin-bottom:4px">ÉTAPES (0-12)</div><table style="width:100%;border-collapse:collapse"><tr>${cells(0,12)}</tr></table></div></div><div style="text-align:center;margin-top:10px"><button onclick="window.print()" style="padding:6px 20px;font-size:13px;cursor:pointer">🖨 Imprimer</button></div></body></html>`;
   const w=window.open('','_blank');w.document.write(html);w.document.close();
 }
 function renderExpStats(){
@@ -4079,9 +4079,9 @@ function buildCSV(lots){
   let c='Lot;Date lot;Poudre;Charge (gr);Projectile;CBTO (mm);Jump (mm);Sbump (mm);BC G1;BC G7 Quantum;Date tir;Dist (m);V0 moy (m/s);ES;SD;Grp mm;Grp MOA;Temp (°C);Coups;Notes\n';
   lots.forEach(l=>{
     if(!l.tirs||!l.tirs.length){
-      c+=`${l.ref};${l.date};${l.poudre||''};${l.charge||''};${l.proj||''};${l.cbto||''};${l.jump||''};${l.sbump!=null?l.sbump:''};${l.bc||''};${l.bcG7||''};;;;;;;;\n`;
+      c+=`${esc(l.ref)};${esc(l.date)};${l.poudre||''};${l.charge||''};${l.proj||''};${l.cbto||''};${l.jump||''};${l.sbump!=null?l.sbump:''};${l.bc||''};${l.bcG7||''};;;;;;;;\n`;
     }else{
-      l.tirs.forEach(t=>{c+=`${l.ref};${l.date};${l.poudre||''};${l.charge||''};${l.proj||''};${l.cbto||''};${l.jump||''};${l.sbump!=null?l.sbump:''};${l.bc||''};${l.bcG7||''};${t.date};${t.dist||''};${t.v0||''};${t.es||''};${t.sd||''};${t.mm||''};${t.moa||''};${t.temp||''};${t.coups||''};${(t.notes||'').replace(/[;\n\r]/g,' ')}\n`;});
+      l.tirs.forEach(t=>{c+=`${esc(l.ref)};${esc(l.date)};${l.poudre||''};${l.charge||''};${l.proj||''};${l.cbto||''};${l.jump||''};${l.sbump!=null?l.sbump:''};${l.bc||''};${l.bcG7||''};${esc(t.date)};${t.dist||''};${t.v0||''};${t.es||''};${t.sd||''};${t.mm||''};${t.moa||''};${t.temp||''};${t.coups||''};${(t.notes||'').replace(/[;\n\r]/g,' ')}\n`;});
     }
   });
   return c;
@@ -4143,13 +4143,44 @@ function importJSON(ev){
   r.readAsText(f);
 }
 function clearAll(){
-  if(!confirm('⚠️ SUPPRIMER toutes les données ? Lots, sessions, photos, profil arme, lunette et paramètres seront effacés.'))return;
-  // Supprimer toutes les clés localStorage
-  [KEY,TKEY,SKEY,UKEY,AKEY,ARMESKEY].forEach(function(k){localStorage.removeItem(k);});
+  if(!confirm('⚠️ SUPPRIMER toutes les données ? Lots, sessions, photos, profil arme, profil lunette, armes enregistrées, journal de maintenance et paramètres seront effacés.\n\n(L\'URL de mise à jour de l\'application sera conservée.)'))return;
+  // Préserver UPDATE_URL_KEY (configuration technique, pas une donnée utilisateur)
+  var preservedUpdateUrl=null;
+  try{preservedUpdateUrl=localStorage.getItem(UPDATE_URL_KEY);}catch(e){console.error('clearAll: lecture UPDATE_URL_KEY',e);}
+  // Supprimer toutes les clés localStorage connues (UPDATE_URL_KEY exclue)
+  var keysToWipe=[KEY,TKEY,SKEY,UKEY,AKEY,ARMESKEY,MNTKEY];
+  keysToWipe.forEach(function(k){try{localStorage.removeItem(k);}catch(e){console.error('clearAll: removeItem '+k,e);}});
+  // Filet de sécurité : balayer toutes les clés résiduelles préfixées 308win_ (sauf UPDATE_URL_KEY)
+  try{
+    for(var i=localStorage.length-1;i>=0;i--){
+      var k=localStorage.key(i);
+      if(k&&k.indexOf('308win_')===0&&k!==UPDATE_URL_KEY)localStorage.removeItem(k);
+    }
+  }catch(e){console.error('clearAll: balayage 308win_',e);}
+  // Restaurer UPDATE_URL_KEY si elle existait
+  try{if(preservedUpdateUrl!==null)localStorage.setItem(UPDATE_URL_KEY,preservedUpdateUrl);}catch(e){console.error('clearAll: restauration UPDATE_URL_KEY',e);}
   // Vider la base IndexedDB des photos
-  try{indexedDB.deleteDatabase(PHOTO_DB_NAME);}catch(e){}
-  renderLots();renderExpStats();
-  alert('Données effacées (lots, sessions, photos, profil arme, lunette, paramètres).');
+  try{indexedDB.deleteDatabase(PHOTO_DB_NAME);}catch(e){console.error('clearAll: indexedDB',e);}
+  // Réinitialiser tous les champs de formulaire de l'application (arme, lunette, tourelle, paramètres, maintenance, export)
+  try{
+    document.querySelectorAll('#tab-arme input, #tab-arme select, #tab-arme textarea, #tab-entretien input, #tab-entretien select, #tab-entretien textarea, #tab-export input, #tab-export select, #tab-export textarea').forEach(function(el){
+      // Ne pas écraser le champ contenant l'URL de mise à jour
+      if(el.id==='update-url-input'||el.name==='update-url')return;
+      if(el.type==='checkbox'||el.type==='radio')el.checked=false; else el.value='';
+    });
+  }catch(e){console.error('clearAll: reset champs',e);}
+  // Recharger toute l'UI à partir d'un état vide
+  try{newArmeProfile&&newArmeProfile();}catch(e){console.error('clearAll: newArmeProfile',e);}
+  try{renderLots();}catch(e){console.error('clearAll: renderLots',e);}
+  try{loadTourelle();}catch(e){console.error('clearAll: loadTourelle',e);}
+  try{loadArme();}catch(e){console.error('clearAll: loadArme',e);}
+  try{loadSettings();}catch(e){console.error('clearAll: loadSettings',e);}
+  try{renderArmes();}catch(e){console.error('clearAll: renderArmes',e);}
+  try{renderExpStats();}catch(e){console.error('clearAll: renderExpStats',e);}
+  try{renderAllWithUnit&&renderAllWithUnit();}catch(e){console.error('clearAll: renderAllWithUnit',e);}
+  try{renderMaintenanceAlerts();}catch(e){console.error('clearAll: renderMaintenanceAlerts',e);}
+  try{renderTirSessions&&renderTirSessions();}catch(e){console.error('clearAll: renderTirSessions',e);}
+  alert('✅ Toutes les données ont été effacées (lots, sessions, photos, profil arme, profil lunette, armes enregistrées, journal de maintenance, paramètres).\nL\'URL de mise à jour a été conservée.');
 }
 function renderPerLotExport(){
   const d=getData(),c=document.getElementById('per-lot-export');
@@ -4158,7 +4189,7 @@ function renderPerLotExport(){
   d.lots.forEach(l=>{
     const n=(l.tirs||[]).length;
     h+=`<div style="background:#f8fafd;border:1px solid #c8daea;border-radius:6px;padding:8px 12px;display:flex;align-items:center;gap:10px">
-      <div><strong style="font-size:13px">${l.ref}</strong><div style="font-size:11px;color:#6080a0">${l.poudre||'—'} ${l.charge?'/ '+l.charge+' gr':''} · <span class="badge bg-bl">${n} session${n>1?'s':''}</span></div></div>
+      <div><strong style="font-size:13px">${esc(l.ref)}</strong><div style="font-size:11px;color:#6080a0">${esc(l.poudre||'—')} ${l.charge?'/ '+l.charge+' gr':''} · <span class="badge bg-bl">${n} session${n>1?'s':''}</span></div></div>
       <button class="btn bg" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportLotCSV('${l.id}')">⬇ CSV</button>
     </div>`;
   });
@@ -4186,7 +4217,7 @@ function terrainRefreshLots(){
   const d=getData();
   sel.innerHTML='<option value="">— Sélectionner un lot —</option>';
   d.lots.forEach(l=>{
-    sel.innerHTML+=`<option value="${l.id}" ${l.id===cur?'selected':''}>${l.ref}${l.proj?' — '+l.proj.slice(0,22):''}${l.charge?' — '+l.charge+' gr':''}</option>`;
+    sel.innerHTML+=`<option value="${l.id}" ${l.id===cur?'selected':''}>${esc(l.ref)}${l.proj?' — '+l.proj.slice(0,22):''}${l.charge?' — '+l.charge+' gr':''}</option>`;
   });
   terrainCheckReady();
 }
@@ -4199,7 +4230,7 @@ function terrainLotChanged(){
     const total=(l.tirs||[]).reduce((s,t)=>s+(t.coups||0),0);
     const lastTir=(l.tirs||[]).slice(-1)[0];
     info.style.display='block';
-    info.innerHTML=`📦 <strong>${l.ref}</strong> · ${l.proj||'—'} · ${l.poudre||'—'} ${l.charge?l.charge+' gr':''}
+    info.innerHTML=`📦 <strong>${esc(l.ref)}</strong> · ${esc(l.proj||'—')} · ${esc(l.poudre||'—')} ${l.charge?l.charge+' gr':''}
       ${total>0?`· <strong>${total} coups</strong>`:''} 
       ${lastTir?`<br>📅 Dernière session : ${lastTir.date} · ${lastTir.dist?lastTir.dist+' m':'—'}`:''} `;
     // Pré-remplir distance depuis dernière session
@@ -4303,7 +4334,7 @@ function makeQRCanvas(data,size){
       ctx.fillStyle='#000';
       for(var r=0;r<n;r++)for(var c=0;c<n;c++)if(qr.isDark(r,c))ctx.fillRect(c*cell+8,r*cell+8,cell,cell);
       return canvas;
-    }catch(e){}
+    }catch(e){console.error(e);}
   }
   return null;
 }
@@ -4402,7 +4433,7 @@ function qrScanStart(){
                 }
               }
             }
-          }catch(e){}
+          }catch(e){console.error(e);}
           if(_qrComplete){qrScanComplete();return;}
         }
         _scanLoop=requestAnimationFrame(tick);
@@ -4491,7 +4522,7 @@ function deletePhoto(key) {
       tx.objectStore('photos').delete(key);
       tx.oncomplete = resolve; tx.onerror = resolve;
     });
-  }).catch(function(){});
+  }).catch(function(e){console.error(e);});
 }
 
 // ========================
@@ -5044,7 +5075,9 @@ function renderMaintenanceLog() {
 // ========================
 
 // ---- VERSION ----
-var APP_VERSION='9.4';
+// esc(): échappe les valeurs utilisateur insérées via innerHTML (XSS-safe)
+function esc(v){if(v==null)return '';return String(v).replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
+var APP_VERSION='9.7';
 var APP_DATE='2026-05-13';
 var UPDATE_URL_KEY='308win_update_url';
 
@@ -5111,6 +5144,32 @@ renderLots();loadTourelle();loadArme();loadSettings();renderExpStats();renderArm
 renderAllWithUnit(); // C-2 : met à jour les labels V₀/ES/SD selon l'unité restaurée
 initVersionDisplay();
 renderMaintenanceAlerts();
+
+// A11Y : lier automatiquement chaque <label> sans for= au champ associé
+(function bindLabelsForA11y(){
+  try{
+    var labels=document.querySelectorAll('label:not([for])');
+    var auto=0;
+    labels.forEach(function(lab){
+      // Cas 1 : label englobe déjà l'input (pattern <label>txt<input></label>) — déjà accessible, on saute
+      var inner=lab.querySelector('input,select,textarea');
+      if(inner){
+        if(!inner.id) inner.id='a11y-fld-'+(++auto);
+        lab.setAttribute('for',inner.id);
+        return;
+      }
+      // Cas 2 : label suivi d'un input frère (ou imbriqué dans le parent direct)
+      var sib=lab.nextElementSibling;
+      if(!sib||!sib.matches('input,select,textarea')){
+        sib=lab.parentElement&&lab.parentElement.querySelector('input,select,textarea');
+      }
+      if(sib){
+        if(!sib.id) sib.id='a11y-fld-'+(++auto);
+        lab.setAttribute('for',sib.id);
+      }
+    });
+  }catch(e){console.error('bindLabelsForA11y',e);}
+})();
 
 
 </script>
