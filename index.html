@@ -287,6 +287,8 @@ canvas{display:block;background:#f8fafd;border-radius:6px;border:1px solid #dce8
     <button class="btn bs" id="btn-cible-impact" onclick="cibleSetMode('impact')" style="display:none">🎯 Placer impacts</button>
     <button class="btn bd" id="btn-cible-undo" onclick="cibleUndo()" style="display:none">↩ Défaire</button>
     <button class="btn bd" id="btn-cible-clearall" onclick="cibleClearImpacts()" style="display:none">🗑 Impacts</button>
+    <button class="btn bs" id="btn-cible-center" onclick="cibleSetMode('center')" style="display:none">📍 Centre cible</button>
+    <button class="btn bd" id="btn-cible-clearcenter" onclick="cibleClearCenter()" style="display:none">🗑 Centre</button>
   </div>
   <div id="cible-mode-banner" style="display:none;font-size:12px;padding:7px 12px;border-radius:5px;margin-bottom:10px;font-weight:500"></div>
 
@@ -3511,15 +3513,23 @@ function saveTir(){
       for(var i=0;i<_cbl.impacts.length;i++){var dx=_cbl.impacts[i].x-mpi.x,dy=_cbl.impacts[i].y-mpi.y;var r=Math.sqrt(dx*dx+dy*dy);if(r>maxR)maxR=r;}
     }
     var rayonMm = (mpi && _cbl.scalePxPerMm) ? (maxR/_cbl.scalePxPerMm).toFixed(1) : null;
+    var mpiOffsetX_mm = null, mpiOffsetY_mm = null;
+    if (mpi && _cbl.scalePxPerMm && _cbl.center) {
+      mpiOffsetX_mm = parseFloat(((mpi.x - _cbl.center.x) / _cbl.scalePxPerMm).toFixed(2));
+      mpiOffsetY_mm = parseFloat(((mpi.y - _cbl.center.y) / _cbl.scalePxPerMm).toFixed(2));
+    }
     cibleToSave = {
       impacts: _cbl.impacts.slice(),
       calibPts: (_cbl.calibPts||[]).slice(),
       scalePxPerMm: _cbl.scalePxPerMm||null,
       refMm: parseFloat(document.getElementById('cible-ref-mm').value)||null,
+      center: _cbl.center || null,
       nbImpacts: _cbl.impacts.length,
       esMm: esMm ? parseFloat(esMm) : null,
       esMoa: esMoa ? parseFloat(esMoa) : null,
-      rayonMm: rayonMm ? parseFloat(rayonMm) : null
+      rayonMm: rayonMm ? parseFloat(rayonMm) : null,
+      mpiOffsetX_mm: mpiOffsetX_mm,
+      mpiOffsetY_mm: mpiOffsetY_mm
     };
   }
   if(editingTirId&&editingTirLotId===lotId){const idx=lot.tirs.findIndex(t=>t.id===editingTirId);if(idx>=0){lot.tirs[idx]={...lot.tirs[idx],...f};if(cibleToSave!==null)lot.tirs[idx].cibleData=cibleToSave;}editingTirId=null;editingTirLotId=null;document.getElementById('save-tir-btn').textContent='✅ Enregistrer';document.getElementById('tir-edit-banner').style.display='none';}
@@ -3538,6 +3548,7 @@ function cibleFullReset() {
   _cbl.scalePxPerMm = null;
   _cbl.img = null;
   _cbl.mode = null;
+  _cbl.center = null;
   
   var ids = ['cible-ref-mm', 'cible-stored-results', 'cible-result-row', 'cible-inject-row', 'cible-canvas-outer'];
   for (var i = 0; i < ids.length; i++) {
@@ -3609,6 +3620,7 @@ function loadTir(lotId,tirId){
     _cbl.impacts = (t.cibleData.impacts||[]).map(function(p){return{x:p.x,y:p.y};});
     _cbl.calibPts = (t.cibleData.calibPts||[]).map(function(p){return{x:p.x,y:p.y};});
     _cbl.scalePxPerMm = t.cibleData.scalePxPerMm||null;
+    _cbl.center = t.cibleData.center ? {x:t.cibleData.center.x, y:t.cibleData.center.y} : null;
     _cbl.img = null;
     if(t.cibleData.refMm) document.getElementById('cible-ref-mm').value = t.cibleData.refMm;
     // Afficher le panneau résultats stockés (sera remplacé si photo trouvée)
@@ -4570,6 +4582,40 @@ function cibleShowStoredResults(cd, coupsSession) {
     + '<div class="rbox"><div class="rval" style="font-size:20px;color:#c0392b" id="cible-stored-esmm-val">' + (cd.esMm ? cd.esMm.toFixed(1) + ' mm' : '—') + '</div><div class="rlbl">Groupement ES</div></div>'
     + '<div class="rbox"><div class="rval" style="font-size:20px;color:#2a6090" id="cible-stored-moa-val">' + (esMoaCalc ? esMoaCalc + ' MOA' : '—') + '</div><div class="rlbl">à <span id="cible-stored-dist-lbl">' + dist + '</span> m</div></div>'
     + '<div class="rbox"><div class="rval" style="font-size:20px;color:#207040">' + (cd.rayonMm ? cd.rayonMm.toFixed(1) + ' mm' : '—') + '</div><div class="rlbl">Rayon MPI max</div></div>';
+  // Écart MPI stocké
+  if (cd.mpiOffsetX_mm != null && cd.mpiOffsetY_mm != null) {
+    var storedDist = dist;
+    var clicsPerMoa = parseInt((document.getElementById('tr-clics-per-moa')||{}).value) || 4;
+    var sxMm = cd.mpiOffsetX_mm, syMm = cd.mpiOffsetY_mm;
+    var sxMoa = Math.abs(sxMm) * 10.8 / (storedDist * Math.PI);
+    var syMoa = Math.abs(syMm) * 10.8 / (storedDist * Math.PI);
+    var sxClics = Math.round(sxMoa * clicsPerMoa), syClics = Math.round(syMoa * clicsPerMoa);
+    var sLatPos = sxMm > 0.05 ? '→ droite' : sxMm < -0.05 ? '← gauche' : '= centré';
+    var sVertPos = syMm > 0.05 ? '↓ bas' : syMm < -0.05 ? '↑ haut' : '= centré';
+    var sCorrLat = sxMm > 0.05 ? '← gauche' : sxMm < -0.05 ? '→ droite' : '—';
+    var sCorrVert = syMm > 0.05 ? '↑ hausse' : syMm < -0.05 ? '↓ baisse' : '—';
+    var sCentLat = Math.abs(sxMm) < 0.05, sCentVert = Math.abs(syMm) < 0.05;
+    grid.innerHTML +=
+      '<div style="grid-column:1/-1;margin-top:2px;background:#eef0fc;border-radius:6px;padding:9px 12px;border:1px solid #b8c4e8">'
+      + '<div style="font-size:10px;font-weight:700;color:#2a3a90;margin-bottom:6px">📍 Écart MPI / centre enregistré</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">'
+      + '<div style="background:#fff;border-radius:4px;padding:6px;border:1px solid #c8d0ec;text-align:center">'
+      + '<div style="font-size:9px;color:#5060a0;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">⬛ Latéral</div>'
+      + '<div style="font-size:16px;font-weight:700;color:#6030a0">' + (sCentLat?'0.0':Math.abs(sxMm).toFixed(1)) + ' mm</div>'
+      + '<div style="font-size:10px;color:#6060a0">' + sLatPos + ' · ' + sxMoa.toFixed(2) + ' MOA</div>'
+      + (sCentLat ? '<div style="font-size:9px;font-weight:700;color:#207040;margin-top:3px">✓ Centré</div>'
+        : '<div style="font-size:9px;font-weight:700;color:#2a4090;margin-top:3px">Correction : ' + sxClics + ' clic' + (sxClics!==1?'s':'') + ' ' + sCorrLat + '</div>')
+      + '</div>'
+      + '<div style="background:#fff;border-radius:4px;padding:6px;border:1px solid #c8d0ec;text-align:center">'
+      + '<div style="font-size:9px;color:#5060a0;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">⬛ Vertical</div>'
+      + '<div style="font-size:16px;font-weight:700;color:#6030a0">' + (sCentVert?'0.0':Math.abs(syMm).toFixed(1)) + ' mm</div>'
+      + '<div style="font-size:10px;color:#6060a0">' + sVertPos + ' · ' + syMoa.toFixed(2) + ' MOA</div>'
+      + (sCentVert ? '<div style="font-size:9px;font-weight:700;color:#207040;margin-top:3px">✓ Centré</div>'
+        : '<div style="font-size:9px;font-weight:700;color:#2a4090;margin-top:3px">Correction : ' + syClics + ' clic' + (syClics!==1?'s':'') + ' ' + sCorrVert + '</div>')
+      + '</div>'
+      + '</div></div>'
+      + '<style>#cible-stored-grid{grid-template-columns:repeat(2,1fr)!important;grid-auto-rows:auto;}</style>';
+  }
   if (coupsWarn) {
     var diff = Math.abs(cd.nbImpacts - parseInt(coupsSession));
     var more = cd.nbImpacts > parseInt(coupsSession);
@@ -4621,10 +4667,11 @@ function cibleRefreshMOA() {
 
 var _cbl = {
   img: null,
-  mode: 'impact',       // 'calib' | 'impact'
+  mode: 'impact',       // 'calib' | 'impact' | 'center'
   calibPts: [],         // 0, 1 ou 2 points de calibration
   scalePxPerMm: null,   // facteur d'échelle calculé
-  impacts: []           // [{x,y}, ...]
+  impacts: [],          // [{x,y}, ...]
+  center: null          // {x,y} — centre de la cible (point de visée)
 };
 
 function loadCiblePhoto(evt) {
@@ -4650,8 +4697,8 @@ function loadCiblePhoto(evt) {
       var sr=document.getElementById('cible-stored-results');if(sr)sr.style.display='none';
       document.getElementById('cible-empty-msg').style.display = 'none';
       document.getElementById('cible-canvas-outer').style.display = 'block';
-      ['btn-cible-calib','btn-cible-impact','btn-cible-undo','btn-cible-clearall'].forEach(function(id){
-        document.getElementById(id).style.display = 'inline-block';
+      ['btn-cible-calib','btn-cible-impact','btn-cible-undo','btn-cible-clearall','btn-cible-center','btn-cible-clearcenter'].forEach(function(id){
+        var el = document.getElementById(id); if(el) el.style.display = 'inline-block';
       });
       cibleInitCanvas();
       // Si l'état est conservé : aller directement en mode impact (ne pas réinitialiser calibPts)
@@ -4663,14 +4710,17 @@ function loadCiblePhoto(evt) {
         var calibRow = document.getElementById('cible-calib-row');
         var btnC = document.getElementById('btn-cible-calib');
         var btnI = document.getElementById('btn-cible-impact');
+        var btnCtr = document.getElementById('btn-cible-center');
         if (banner) {
           banner.style.display = 'block';
           banner.style.background = '#e8f8ef'; banner.style.border = '1px solid #60c080'; banner.style.color = '#1a6030';
-          banner.textContent = '🎯 Session restaurée — ' + _cbl.impacts.length + ' impact(s) rechargé(s). Clic droit = défaire. MPI en vert, ES en pointillés.';
+          var centerInfo = _cbl.center ? ' Centre placé. ' : '';
+          banner.textContent = '🎯 Session restaurée —' + centerInfo + ' ' + _cbl.impacts.length + ' impact(s) rechargé(s). Clic droit = défaire. MPI en vert, ES en pointillés.';
         }
         if (calibRow) calibRow.style.display = 'none';
         if (btnI) { btnI.style.fontWeight = '700'; btnI.style.background = '#e0f4ea'; }
         if (btnC) { btnC.style.fontWeight = ''; btnC.style.background = ''; }
+        if (btnCtr) { btnCtr.style.fontWeight = ''; btnCtr.style.background = ''; }
       } else {
         cibleSetMode('calib');
       }
@@ -4717,6 +4767,20 @@ function cibleHandlePoint(pos) {
       cibleApplyCalib();
       cibleRedraw();
     }
+  } else if (_cbl.mode === 'center') {
+    _cbl.center = pos;
+    _cbl.mode = 'impact';
+    var banner = document.getElementById('cible-mode-banner');
+    var btnCtr = document.getElementById('btn-cible-center');
+    var btnI = document.getElementById('btn-cible-impact');
+    if (banner) {
+      banner.style.background = '#e8f8ef'; banner.style.border = '1px solid #60c080'; banner.style.color = '#1a6030';
+      banner.textContent = '🎯 Mode IMPACTS — Cliquez sur chaque trou. Clic droit = défaire. MPI en vert, ES en pointillés.';
+    }
+    if (btnI) { btnI.style.fontWeight = '700'; btnI.style.background = '#e0f4ea'; }
+    if (btnCtr) { btnCtr.style.fontWeight = ''; btnCtr.style.background = ''; }
+    cibleRedraw();
+    cibleUpdateResults();
   } else {
     _cbl.impacts.push(pos);
     cibleRedraw();
@@ -4730,6 +4794,7 @@ function cibleSetMode(mode) {
   var calibRow = document.getElementById('cible-calib-row');
   var btnC = document.getElementById('btn-cible-calib');
   var btnI = document.getElementById('btn-cible-impact');
+  var btnCtr = document.getElementById('btn-cible-center');
   banner.style.display = 'block';
   if (mode === 'calib') {
     _cbl.calibPts = [];
@@ -4739,8 +4804,17 @@ function cibleSetMode(mode) {
     banner.textContent = '📐 Mode CALIBRAGE — Cliquez les points A puis B sur la cible, puis entrez la distance réelle entre eux';
     btnC.style.fontWeight = '700'; btnC.style.background = '#fef3e0';
     btnI.style.fontWeight = ''; btnI.style.background = '';
+    if (btnCtr) { btnCtr.style.fontWeight = ''; btnCtr.style.background = ''; }
     cibleUpdateCalibStatus();
     cibleRedraw();
+    cibleUpdateResults();
+  } else if (mode === 'center') {
+    calibRow.style.display = 'none';
+    banner.style.background = '#e8f0fc'; banner.style.border = '1px solid #6090d0'; banner.style.color = '#2050a0';
+    banner.textContent = '📍 Mode CENTRE — Cliquez sur le point de visée central de la cible (bulls-eye). Un seul point suffit.';
+    if (btnCtr) { btnCtr.style.fontWeight = '700'; btnCtr.style.background = '#e8f0fc'; }
+    btnC.style.fontWeight = ''; btnC.style.background = '';
+    btnI.style.fontWeight = ''; btnI.style.background = '';
     cibleUpdateResults();
   } else {
     calibRow.style.display = 'none';
@@ -4748,6 +4822,7 @@ function cibleSetMode(mode) {
     banner.textContent = '🎯 Mode IMPACTS — Cliquez sur chaque trou. Clic droit = défaire. MPI en vert, ES en pointillés.';
     btnI.style.fontWeight = '700'; btnI.style.background = '#e0f4ea';
     btnC.style.fontWeight = ''; btnC.style.background = '';
+    if (btnCtr) { btnCtr.style.fontWeight = ''; btnCtr.style.background = ''; }
     cibleUpdateResults();
   }
 }
@@ -4802,6 +4877,12 @@ function cibleClearImpacts() {
   cibleUpdateResults();
 }
 
+function cibleClearCenter() {
+  _cbl.center = null;
+  cibleRedraw();
+  cibleUpdateResults();
+}
+
 function cibleRedraw() {
   var canvas = document.getElementById('cible-canvas');
   var img = _cbl.img;
@@ -4848,6 +4929,26 @@ function cibleRedraw() {
     ctx.moveTo(mpi.x-11, mpi.y); ctx.lineTo(mpi.x+11, mpi.y);
     ctx.moveTo(mpi.x, mpi.y-11); ctx.lineTo(mpi.x, mpi.y+11);
     ctx.strokeStyle = '#207040'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+  // Centre cible (point de visée)
+  if (_cbl.center) {
+    var cx = _cbl.center.x, cy = _cbl.center.y;
+    ctx.beginPath(); ctx.arc(cx, cy, 10, 0, 2*Math.PI);
+    ctx.strokeStyle = '#1a50c0'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx-8, cy-8); ctx.lineTo(cx+8, cy+8);
+    ctx.moveTo(cx+8, cy-8); ctx.lineTo(cx-8, cy+8);
+    ctx.strokeStyle = '#1a50c0'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#1a50c0'; ctx.font = 'bold 8px -apple-system,sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText('C', cx, cy+12);
+    // Ligne MPI → Centre si applicable
+    if (_cbl.impacts.length >= 1) {
+      var mpiL = _cbl.impacts.length >= 2 ? cibleCalcMPI() : _cbl.impacts[0];
+      ctx.beginPath();
+      ctx.moveTo(cx, cy); ctx.lineTo(mpiL.x, mpiL.y);
+      ctx.strokeStyle = 'rgba(80,80,200,0.35)'; ctx.lineWidth = 1; ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+    }
   }
   // Impacts
   for (var j = 0; j < _cbl.impacts.length; j++) {
@@ -4918,6 +5019,54 @@ function cibleUpdateResults() {
       + (more ? ' Vérifiez les impacts en excès.' : ' Des impacts sont peut-être manquants.')
       + '</div>';
   }
+  // ---- Écart MPI / centre de la cible ----
+  var mpiOffsetSection = '';
+  if (_cbl.scalePxPerMm && n >= 1) {
+    var mpiPos = n >= 2 ? cibleCalcMPI() : _cbl.impacts[0];
+    if (_cbl.center) {
+      var dxPx = mpiPos.x - _cbl.center.x;
+      var dyPx = mpiPos.y - _cbl.center.y;
+      var dxMm = dxPx / _cbl.scalePxPerMm;
+      var dyMm = dyPx / _cbl.scalePxPerMm; // positif = bas (canvas Y↓)
+      var clicsPerMoa = parseInt((document.getElementById('tr-clics-per-moa')||{}).value) || 4;
+      var dxMoa = Math.abs(dxMm) * 10.8 / (dist2 * Math.PI);
+      var dyMoa = Math.abs(dyMm) * 10.8 / (dist2 * Math.PI);
+      var dxClics = Math.round(dxMoa * clicsPerMoa);
+      var dyClics = Math.round(dyMoa * clicsPerMoa);
+      var latPos = dxMm > 0.05 ? '→ droite' : dxMm < -0.05 ? '← gauche' : '= centré';
+      var vertPos = dyMm > 0.05 ? '↓ bas' : dyMm < -0.05 ? '↑ haut' : '= centré';
+      var corrLat = dxMm > 0.05 ? '← gauche' : dxMm < -0.05 ? '→ droite' : '—';
+      var corrVert = dyMm > 0.05 ? '↑ hausse' : dyMm < -0.05 ? '↓ baisse' : '—';
+      var isCentredLat = Math.abs(dxMm) < 0.05, isCentredVert = Math.abs(dyMm) < 0.05;
+      mpiOffsetSection =
+        '<div style="margin-top:10px;background:#eef0fc;border-radius:6px;padding:10px 12px;border:1px solid #b8c4e8">'
+        + '<div style="font-size:11px;font-weight:700;color:#2a3a90;margin-bottom:8px">📍 Écart MPI / centre de la cible</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+        // Latéral
+        + '<div style="background:#fff;border-radius:5px;padding:8px;border:1px solid #c8d0ec;text-align:center">'
+        + '<div style="font-size:10px;color:#5060a0;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">⬛ Latéral</div>'
+        + '<div style="font-size:19px;font-weight:700;color:#6030a0">' + (isCentredLat ? '0.0' : Math.abs(dxMm).toFixed(1)) + ' mm</div>'
+        + '<div style="font-size:11px;color:#6060a0;margin-top:1px">' + latPos + '</div>'
+        + '<div style="font-size:10px;color:#3050a0;margin-top:3px">' + dxMoa.toFixed(2) + ' MOA</div>'
+        + (isCentredLat
+          ? '<div style="background:#e0f4ea;border-radius:4px;padding:2px 6px;margin-top:5px;font-size:10px;font-weight:700;color:#207040">✓ Centré</div>'
+          : '<div style="background:#e0e4f8;border-radius:4px;padding:2px 6px;margin-top:5px;font-size:10px;font-weight:700;color:#2a4090">Correction : ' + dxClics + ' clic' + (dxClics!==1?'s':'') + ' ' + corrLat + '</div>')
+        + '</div>'
+        // Vertical
+        + '<div style="background:#fff;border-radius:5px;padding:8px;border:1px solid #c8d0ec;text-align:center">'
+        + '<div style="font-size:10px;color:#5060a0;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">⬛ Vertical</div>'
+        + '<div style="font-size:19px;font-weight:700;color:#6030a0">' + (isCentredVert ? '0.0' : Math.abs(dyMm).toFixed(1)) + ' mm</div>'
+        + '<div style="font-size:11px;color:#6060a0;margin-top:1px">' + vertPos + '</div>'
+        + '<div style="font-size:10px;color:#3050a0;margin-top:3px">' + dyMoa.toFixed(2) + ' MOA</div>'
+        + (isCentredVert
+          ? '<div style="background:#e0f4ea;border-radius:4px;padding:2px 6px;margin-top:5px;font-size:10px;font-weight:700;color:#207040">✓ Centré</div>'
+          : '<div style="background:#e0e4f8;border-radius:4px;padding:2px 6px;margin-top:5px;font-size:10px;font-weight:700;color:#2a4090">Correction : ' + dyClics + ' clic' + (dyClics!==1?'s':'') + ' ' + corrVert + '</div>')
+        + '</div>'
+        + '</div></div>';
+    } else {
+      mpiOffsetSection = '<div style="margin-top:8px;font-size:11px;color:#6080a0;font-style:italic">💡 Placez le <strong>📍 Centre cible</strong> pour mesurer l\'écart latéral et vertical du MPI en mm / clics.</div>';
+    }
+  }
   resEl.innerHTML =
     '<div style="background:#f0f5fc;border-radius:6px;padding:12px;border:1px solid #c8daea">'
     +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
@@ -4926,6 +5075,7 @@ function cibleUpdateResults() {
     +'<div class="rbox"><div class="rval" style="color:#2a6090">'+(esMoa?esMoa+' MOA':'—')+'</div><div class="rlbl">à '+dist2+' m</div></div>'
     +'</div>'
     +(rayonMm?'<div style="font-size:11px;color:#6080a0;margin-top:8px;text-align:center">Rayon MPI max : <strong style="color:#207040">'+rayonMm+' mm</strong></div>':'')
+    +mpiOffsetSection
     +coupsAlert
     +noScale
     +'</div>';
@@ -5077,8 +5227,8 @@ function renderMaintenanceLog() {
 // ---- VERSION ----
 // esc(): échappe les valeurs utilisateur insérées via innerHTML (XSS-safe)
 function esc(v){if(v==null)return '';return String(v).replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
-var APP_VERSION='9.7';
-var APP_DATE='2026-05-13';
+var APP_VERSION='9.8';
+var APP_DATE='2026-05-14';
 var UPDATE_URL_KEY='308win_update_url';
 
 function initVersionDisplay(){
