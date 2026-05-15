@@ -73,16 +73,16 @@ canvas{display:block;background:#f8fafd;border-radius:6px;border:1px solid #dce8
 <header>
   <div style="font-size:22px">🎯</div>
   <div><div class="title">.308 WIN — Rechargement & Balistique</div><div class="sub" id="app-version-sub">Suivi de lots · Résultats de tir · Analyse</div></div>
-  <span id="update-badge" style="display:none;background:#e8a020;color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;cursor:pointer;white-space:nowrap" onclick="showTab('params');document.getElementById('update-result').scrollIntoView({behavior:'smooth'})">🆕 Mise à jour dispo</span>
+  <span id="update-badge" style="display:none;background:#e8a020;color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;cursor:pointer;white-space:nowrap" onclick="(function(){var b=document.querySelector('nav button[data-tab=export]');showTab('export',b);setTimeout(function(){var el=document.getElementById('update-result');if(el)el.scrollIntoView({behavior:'smooth'});},150);})()">🆕 Mise à jour dispo</span>
   <div id="lastSave">—</div>
 </header>
 <nav>
-  <button class="active" onclick="showTab('arme',this)" ontouchend="stTouch(event,'arme',this)">🔫 Arme</button>
-  <button onclick="showTab('lots',this)" ontouchend="stTouch(event,'lots',this)">📦 Lots</button>
-  <button onclick="showTab('tir',this)" ontouchend="stTouch(event,'tir',this)">🎯 Tir</button>
-  <button onclick="showTab('analyse',this)" ontouchend="stTouch(event,'analyse',this)">📊 Analyse</button>
-  <button onclick="showTab('entretien',this)" ontouchend="stTouch(event,'entretien',this)">🔧 Entretien</button>
-  <button onclick="showTab('export',this)" ontouchend="stTouch(event,'export',this)">💾 Export</button>
+  <button class="active" data-tab="arme" onclick="showTab('arme',this)" ontouchend="stTouch(event,'arme',this)">🔫 Arme</button>
+  <button data-tab="lots" onclick="showTab('lots',this)" ontouchend="stTouch(event,'lots',this)">📦 Lots</button>
+  <button data-tab="tir" onclick="showTab('tir',this)" ontouchend="stTouch(event,'tir',this)">🎯 Tir</button>
+  <button data-tab="analyse" onclick="showTab('analyse',this)" ontouchend="stTouch(event,'analyse',this)">📊 Analyse</button>
+  <button data-tab="entretien" onclick="showTab('entretien',this)" ontouchend="stTouch(event,'entretien',this)">🔧 Entretien</button>
+  <button data-tab="export" onclick="showTab('export',this)" ontouchend="stTouch(event,'export',this)">💾 Export</button>
 </nav>
 
 <!-- ARME -->
@@ -2930,8 +2930,8 @@ const getData=()=>{try{return JSON.parse(localStorage.getItem(KEY))||{lots:[]}}c
 const setData=d=>{localStorage.setItem(KEY,JSON.stringify(d));document.getElementById('lastSave').textContent='Sauvegardé '+new Date().toLocaleTimeString('fr-FR')};
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const fv=id=>document.getElementById(id).value;
-const fn=id=>parseFloat(fv(id))||null;
-const fi=id=>parseInt(fv(id))||null;
+const fn=id=>{const v=parseFloat(fv(id));return isNaN(v)?null:v;};
+const fi=id=>{const v=parseInt(fv(id),10);return isNaN(v)?null:v;};
 const avg=(arr,k)=>{const v=arr.map(t=>t[k]).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
 let editingLotId=null,editingTirId=null,editingTirLotId=null;
 let _v0Calculated=null;
@@ -3424,6 +3424,11 @@ function deleteLot(id){
   if(lot&&lot.tirs&&lot.tirs.length){
     lot.tirs.forEach(function(t){deletePhoto(t.id).catch(function(e){console.error(e);});});
   }
+  // Supprimer également la photo _pending si elle correspond à ce lot (analyse en cours)
+  if(editingTirLotId===id){
+    deletePhoto('_pending').catch(function(e){console.error(e);});
+    editingTirId=null;editingTirLotId=null;
+  }
   d.lots=d.lots.filter(l=>l.id!==id);
   setData(d);renderLots();
 }
@@ -3492,6 +3497,7 @@ function tirFields(){
     sd:fromDisplayUnit(fn('t-sd')),
     mm:fn('t-mm'),moa:fn('t-moa'),coups:fi('t-coups'),
     pres:fn('t-pres'),
+    alt:fn('ch-alt'),
     notes:fv('t-notes'),
     shots:_v0Stats&&_v0Stats.rawVals?_v0Stats.rawVals:null
   };
@@ -4026,10 +4032,10 @@ button{margin:4mm;padding:6px 14px;font-size:10pt;cursor:pointer;background:#1e3
     ${t.moa?`&nbsp;&nbsp;<span style="font-size:10pt;color:#555">${t.moa} MOA</span>`:''}
   </div>
   <div class="box">
-    <div class="lbl">Conditions atmosphériques (module Chasse)</div>
-    Alt. : ${document.getElementById('ch-alt')?.value||'—'} m &nbsp;|&nbsp;
-    Temp. : ${document.getElementById('ch-temp')?.value||'—'}°C &nbsp;|&nbsp;
-    Pression : ${document.getElementById('ch-pres')?.value||'—'} hPa
+    <div class="lbl">Conditions atmosphériques</div>
+    Alt. : ${t.alt!=null?t.alt:document.getElementById('ch-alt')?.value||'—'} m &nbsp;|&nbsp;
+    Temp. : ${t.temp!=null?t.temp+'°C':'—'} &nbsp;|&nbsp;
+    Pression : ${t.pres!=null?t.pres+' mbar':'—'}
   </div>
 </div>
 ${shotSvg}
@@ -4088,12 +4094,13 @@ function renderExpStats(){
   renderPerLotExport();
 }
 function buildCSV(lots){
+  const q=v=>(v==null||v==='')?'':'"'+String(v).replace(/"/g,'""')+'"';
   let c='Lot;Date lot;Poudre;Charge (gr);Projectile;CBTO (mm);Jump (mm);Sbump (mm);BC G1;BC G7 Quantum;Date tir;Dist (m);V0 moy (m/s);ES;SD;Grp mm;Grp MOA;Temp (°C);Coups;Notes\n';
   lots.forEach(l=>{
     if(!l.tirs||!l.tirs.length){
-      c+=`${esc(l.ref)};${esc(l.date)};${l.poudre||''};${l.charge||''};${l.proj||''};${l.cbto||''};${l.jump||''};${l.sbump!=null?l.sbump:''};${l.bc||''};${l.bcG7||''};;;;;;;;\n`;
+      c+=`${q(l.ref)};${q(l.date)};${q(l.poudre)};${l.charge||''};${q(l.proj)};${l.cbto||''};${l.jump!=null?l.jump:''};${l.sbump!=null?l.sbump:''};${l.bc||''};${l.bcG7||''};;;;;;;;\n`;
     }else{
-      l.tirs.forEach(t=>{c+=`${esc(l.ref)};${esc(l.date)};${l.poudre||''};${l.charge||''};${l.proj||''};${l.cbto||''};${l.jump||''};${l.sbump!=null?l.sbump:''};${l.bc||''};${l.bcG7||''};${esc(t.date)};${t.dist||''};${t.v0||''};${t.es||''};${t.sd||''};${t.mm||''};${t.moa||''};${t.temp||''};${t.coups||''};${(t.notes||'').replace(/[;\n\r]/g,' ')}\n`;});
+      l.tirs.forEach(t=>{c+=`${q(l.ref)};${q(l.date)};${q(l.poudre)};${l.charge||''};${q(l.proj)};${l.cbto||''};${l.jump!=null?l.jump:''};${l.sbump!=null?l.sbump:''};${l.bc||''};${l.bcG7||''};${q(t.date)};${t.dist||''};${t.v0||''};${t.es||''};${t.sd||''};${t.mm||''};${t.moa||''};${t.temp||''};${t.coups||''};${q(t.notes)}\n`;});
     }
   });
   return c;
@@ -4171,7 +4178,7 @@ function clearAll(){
   }catch(e){console.error('clearAll: balayage 308win_',e);}
   // Restaurer UPDATE_URL_KEY si elle existait
   try{if(preservedUpdateUrl!==null)localStorage.setItem(UPDATE_URL_KEY,preservedUpdateUrl);}catch(e){console.error('clearAll: restauration UPDATE_URL_KEY',e);}
-  // Vider la base IndexedDB des photos
+  // Vider la base IndexedDB des photos (y compris _pending)
   try{indexedDB.deleteDatabase(PHOTO_DB_NAME);}catch(e){console.error('clearAll: indexedDB',e);}
   // Réinitialiser tous les champs de formulaire de l'application (arme, lunette, tourelle, paramètres, maintenance, export)
   try{
@@ -4463,6 +4470,9 @@ function qrScanComplete(){
     for(var i=1;i<=_scanTotal;i++)compressed+=_scanChunks[i];
     var json=LZString.decompressFromBase64(compressed);
     var payload=JSON.parse(json);
+    var lotsData=payload[KEY]?JSON.parse(payload[KEY]):{lots:[]};
+    var nb=(lotsData.lots||[]).length;
+    if(!confirm('Restaurer la sauvegarde QR ('+nb+' lot(s)) ?\nLes données actuelles seront remplacées.'))return;
     Object.entries(payload).forEach(function(e){localStorage.setItem(e[0],e[1]);});
     renderLots();loadTourelle();loadArme();loadSettings();renderExpStats();renderArmes();renderAllWithUnit();
     var res=document.getElementById('qr-scan-result');
@@ -5227,8 +5237,8 @@ function renderMaintenanceLog() {
 // ---- VERSION ----
 // esc(): échappe les valeurs utilisateur insérées via innerHTML (XSS-safe)
 function esc(v){if(v==null)return '';return String(v).replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
-var APP_VERSION='9.8';
-var APP_DATE='2026-05-14';
+var APP_VERSION='9.9';
+var APP_DATE='2026-05-15';
 var UPDATE_URL_KEY='308win_update_url';
 
 function initVersionDisplay(){
