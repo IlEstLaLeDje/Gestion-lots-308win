@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content=".308 WIN">
 <meta name="theme-color" content="#1e3050">
-<title>.308 WIN v10.0 — Rechargement & Balistique</title>
+<title>.308 WIN v10.3 — Rechargement & Balistique</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,'Segoe UI',sans-serif;background:#eef2f7;color:#1e2d42;min-height:100vh;-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom)}
@@ -138,6 +138,17 @@ canvas{display:block;background:#f8fafd;border-radius:6px;border:1px solid #dce8
   <h2>🗂 Armes enregistrées <span style="font-size:11px;color:#506080;font-weight:400">— cliquer sur une ligne pour rappeler</span></h2>
   <div id="armes-list"><div class="nd">Aucune arme enregistrée.</div></div>
 </div>
+<div class="card">
+  <h2>🔢 Unité de vitesse affichée</h2>
+  <div class="flex" style="align-items:center;gap:12px;flex-wrap:wrap">
+    <label style="margin:0;font-size:13px">Unité :</label>
+    <select id="s-unit" style="width:auto" onchange="saveUnitPref();renderAllWithUnit()">
+      <option value="ms">m/s (SI)</option>
+      <option value="fps">fps (AB Quantum natif)</option>
+    </select>
+    <span id="unit-hint" style="font-size:11px;color:#6080a0">— Les données sont toujours stockées en m/s. Ce réglage change uniquement l'affichage dans l'app.</span>
+  </div>
+</div>
 </div>
 
 <!-- LOTS -->
@@ -217,8 +228,8 @@ canvas{display:block;background:#f8fafd;border-radius:6px;border:1px solid #dce8
   <h2>📊 Saisie V₀ multi-valeurs</h2>
   <p style="color:#5070a0;font-size:12px;margin-bottom:10px">Collez les mesures chrono (une par ligne, ou séparées par virgules/espaces) — calcul automatique V₀ moy, ES et SD.</p>
   <div class="flex mb" style="align-items:center;gap:10px">
-    <button class="btn bs" onclick="triggerQuantumImport()">📂 Importer CSV AB Quantum</button>
-    <input type="file" id="quantum-file" style="display:none" accept=".csv,.txt" onchange="parseQuantumCSV(event)">
+    <button class="btn bs" onclick="triggerQuantumImport()">📂 Importer CSV Chrono (ShotView / Quantum)</button>
+    <input type="file" id="quantum-file" style="display:none" accept=".csv,.txt" onchange="parseChronoCSV(event)">
     <span id="quantum-status" style="font-size:11px;color:#6080a0"></span>
   </div>
   <textarea id="v0-multi" rows="4" placeholder="Ex:&#10;818.3&#10;821.5&#10;819.8&#10;820.1&#10;817.9" oninput="calcV0Stats()"></textarea>
@@ -454,19 +465,6 @@ canvas{display:block;background:#f8fafd;border-radius:6px;border:1px solid #dce8
   </div>
 </div>
 
-<!-- IV. Serrage optique -->
-<div class="card">
-  <h2>🔭 IV. Serrage de l'optique en croix</h2>
-  <div class="alert al-w" style="font-size:12px;margin-bottom:12px">
-    Approchez les vis et serrez-les progressivement en alternant <strong>diagonalement</strong> (Haut-G/Bas-D, puis Haut-D/Bas-G) par paliers (ex : 1,0 N·m puis 2,0 N·m final) pour ne pas contraindre le tube de la lunette.
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
-    <div class="rbox"><div style="font-size:14px;font-weight:700;color:#2a6090">Palier 1</div><div style="font-size:22px;font-weight:700;color:#b07010">1,0 N·m</div><div class="rlbl">Approche — Haut-G/Bas-D</div></div>
-    <div class="rbox"><div style="font-size:14px;font-weight:700;color:#2a6090">Palier 2</div><div style="font-size:22px;font-weight:700;color:#207040">2,0 N·m</div><div class="rlbl">Final — Haut-D/Bas-G</div></div>
-  </div>
-  <div style="font-size:10px;color:#8090a8;margin-top:10px;text-align:right">Document de Maintenance · Browning AB3+ | Stalon X108 | Bore Tech | Guntec</div>
-</div>
-
 <!-- Journal maintenance -->
 <div class="card">
   <h2>📓 Journal de maintenance</h2>
@@ -500,17 +498,6 @@ canvas{display:block;background:#f8fafd;border-radius:6px;border:1px solid #dce8
 
 <!-- EXPORT -->
 <div id="tab-export" class="tab">
-<div class="card">
-  <h2>🔢 Unité de vitesse</h2>
-  <div class="flex" style="align-items:center;gap:12px;flex-wrap:wrap">
-    <label style="margin:0;font-size:13px">Unité affichée :</label>
-    <select id="s-unit" style="width:auto" onchange="saveUnitPref();renderAllWithUnit()">
-      <option value="ms">m/s (SI)</option>
-      <option value="fps">fps (AB Quantum natif)</option>
-    </select>
-    <span id="unit-hint" style="font-size:11px;color:#6080a0">— Les données sont toujours stockées en m/s.</span>
-  </div>
-</div>
 <div class="card">
   <h2>⚙️ Seuils ES / SD configurables</h2>
   <p style="color:#5070a0;font-size:12px;margin-bottom:12px">Personnalisez les seuils de coloration des badges ES et SD selon votre arme et vos exigences.</p>
@@ -13079,26 +13066,88 @@ function renderAllWithUnit(){
 }
 
 // ---- AB QUANTUM CSV IMPORT ----
-function triggerQuantumImport(){document.getElementById('quantum-file').click();}
 function showQuantumError(msg){const el=document.getElementById('quantum-status');el.textContent='❌ '+msg;el.style.color='#c0392b';}
-function parseQuantumCSV(ev){
+// ── parseChronoCSV v10.1 ─────────────────────────────────────────────────
+// Remplace parseChronoCSV. Supporte :
+//   • Garmin ShotView CSV (session unique, virgule, fps ou m/s selon réglage app)
+//   • AB Quantum CSV (virgule, fps)
+//   • Export Excel FR re-enregistré (point-virgule)
+//   • Guillemets CSV ("Velocity (fps)")
+//   • Décimale virgule FR (2690,3)
+//   • BOM UTF-8
+//   • Lignes de résumé (Average, Min, Max, SD…) filtrées automatiquement
+// ─────────────────────────────────────────────────────────────────────────────
+function triggerQuantumImport(){document.getElementById('quantum-file').click();}
+function parseChronoCSV(ev){
   const f=ev.target.files[0];if(!f)return;
   const reader=new FileReader();
   reader.onload=e=>{
-    const lines=e.target.result.split(/\r?\n/).filter(l=>l.trim());
+    // 1. Supprimer BOM UTF-8 éventuel
+    let text=e.target.result;
+    if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
+
+    // 2. Détection automatique du délimiteur (virgule vs point-virgule)
+    //    — ShotView CSV natif : virgule
+    //    — Excel FR re-enregistré : point-virgule
+    const firstLine=text.split(/\r?\n/)[0]||'';
+    const delim=(firstLine.match(/;/g)||[]).length>(firstLine.match(/,/g)||[]).length?';':',';
+
+    // 3. Découpage des cellules avec gestion des guillemets CSV
+    const parseRow=row=>{
+      const cells=[];let cur='',inQ=false;
+      for(let i=0;i<row.length;i++){
+        const c=row[i];
+        if(c==='"'){inQ=!inQ;}
+        else if(c===delim&&!inQ){cells.push(cur.trim());cur='';}
+        else{cur+=c;}
+      }
+      cells.push(cur.trim());
+      return cells;
+    };
+
+    const lines=text.split(/\r?\n/).filter(l=>l.trim());
     if(!lines.length){showQuantumError('Fichier vide.');return;}
-    const header=lines[0].split(',').map(s=>s.trim().toLowerCase());
-    const velIdx=header.findIndex(h=>h.includes('velocity')||h.includes('speed')||h.includes('v (fps)')||h.includes('fps'));
-    if(velIdx===-1){showQuantumError('Colonne vitesse introuvable.');return;}
+
+    // 4. Détection de la colonne vitesse (étendue : ShotView + Quantum + MV)
+    const header=parseRow(lines[0]).map(h=>h.toLowerCase().replace(/^"|"$/g,''));
+    const velIdx=header.findIndex(h=>
+      h.includes('velocity')||h.includes('speed')||
+      h.includes('v (fps)')||h.includes('fps')||
+      h==='mv'||h.includes('muzzle')
+    );
+    if(velIdx===-1){showQuantumError('Colonne vitesse introuvable — headers : '+header.slice(0,6).join(' | '));return;}
+
+    // 5. Détection de l'unité depuis le header
+    //    ShotView exporte fps ou m/s selon le réglage de l'app
+    //    "Velocity (fps)" → fps  /  "Velocity (m/s)" → m/s  /  ambigu → on suppose fps
+    const hdr=header[velIdx];
+    const unitInHeader=hdr.includes('m/s')&&!hdr.includes('fps')?'ms':'fps';
+
+    // 6. Extraction des valeurs — filtre les lignes de résumé (Average, Min, Max…)
+    const SUMMARY_LABELS=/^(average|avg|min|max|sd|std|count|shots?|total|median)/i;
     const vals=[];
     for(let i=1;i<lines.length;i++){
-      const cols=lines[i].split(',');
-      const fps=parseFloat(cols[velIdx]);
-      if(!isNaN(fps)&&fps>0){
-        // F-05/BUG-02 : injecter dans l'unité active (fps×1 ou fps×0.3048) — calcV0Stats() fera fromDisplayUnit()
-        const val = getUnit()==='fps' ? fps : (fps*0.3048).toFixed(1);
-        vals.push(val);
+      const cols=parseRow(lines[i]);
+      // Ignorer les lignes de résumé ShotView (première cellule = label textuel)
+      const firstCell=(cols[0]||'').replace(/^"|"$/g,'').trim();
+      if(SUMMARY_LABELS.test(firstCell))continue;
+      // Extraire et normaliser la valeur de vitesse
+      const raw=(cols[velIdx]||'').replace(/^"|"$/g,'').replace(',','.').trim();
+      const num=parseFloat(raw);
+      if(isNaN(num))continue;
+      // Garde-fou : < 100 fps ou < 30 m/s → probablement un n° de tir ou une erreur
+      if(unitInHeader==='fps'&&num<100)continue;
+      if(unitInHeader==='ms'&&num<30)continue;
+      // Convertir en unité d'affichage active (calcV0Stats() fera fromDisplayUnit())
+      let val;
+      if(unitInHeader==='ms'){
+        // ShotView m/s → convertir en fps si app en fps, sinon garder m/s
+        val=getUnit()==='fps'?(num/0.3048).toFixed(1):num.toFixed(1);
+      }else{
+        // ShotView/Quantum fps → convertir en m/s si app en m/s
+        val=getUnit()==='fps'?num:(num*0.3048).toFixed(1);
       }
+      vals.push(val);
     }
     if(!vals.length){showQuantumError('Aucune valeur valide trouvée.');return;}
     document.getElementById('v0-multi').value=vals.join('\n');
@@ -13108,7 +13157,7 @@ function parseQuantumCSV(ev){
     calcV0Stats();
     ev.target.value='';
   };
-  reader.readAsText(f);
+  reader.readAsText(f,'utf-8');
 }
 
 // ---- V0 MULTI-VALEURS ----
@@ -15340,7 +15389,7 @@ function renderMaintenanceLog() {
 // ---- VERSION ----
 // esc(): échappe les valeurs utilisateur insérées via innerHTML (XSS-safe)
 function esc(v){if(v==null)return '';return String(v).replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
-var APP_VERSION='10.0';
+var APP_VERSION='10.3';
 var APP_DATE='2026-05-15';
 var UPDATE_URL_KEY='308win_update_url';
 
