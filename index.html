@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content=".308 WIN">
 <meta name="theme-color" content="#1e3050">
-<title>.308 WIN v10.6 — Rechargement & Balistique</title>
+<title>.308 WIN v10.7 — Rechargement & Balistique</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,'Segoe UI',sans-serif;background:#eef2f7;color:#1e2d42;min-height:100vh;-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom)}
@@ -14337,7 +14337,7 @@ function clearAll(){
   try{
     document.querySelectorAll('#tab-arme input, #tab-arme select, #tab-arme textarea, #tab-entretien input, #tab-entretien select, #tab-entretien textarea, #tab-export input, #tab-export select, #tab-export textarea').forEach(function(el){
       // Ne pas écraser le champ contenant l'URL de mise à jour
-      if(el.id==='update-url-input'||el.name==='update-url')return;
+      if(el.id==='update-url'||el.name==='update-url')return;
       if(el.type==='checkbox'||el.type==='radio')el.checked=false; else el.value='';
     });
   }catch(e){console.error('clearAll: reset champs',e);}
@@ -15390,7 +15390,7 @@ function renderMaintenanceLog() {
 // ---- VERSION ----
 // esc(): échappe les valeurs utilisateur insérées via innerHTML (XSS-safe)
 function esc(v){if(v==null)return '';return String(v).replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
-var APP_VERSION='10.6';
+var APP_VERSION='10.7';
 var APP_DATE='2026-05-15';
 var UPDATE_URL_KEY='308win_update_url';
 
