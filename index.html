@@ -2,12 +2,18 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content=".308 WIN">
+  <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content=".308 WIN">
 <meta name="theme-color" content="#1e3050">
-<title>.308 WIN v10.7 — Rechargement & Balistique</title>
+<title>.308 WIN v10.8 — Rechargement & Balistique</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,'Segoe UI',sans-serif;background:#eef2f7;color:#1e2d42;min-height:100vh;-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom)}
@@ -15390,7 +15396,7 @@ function renderMaintenanceLog() {
 // ---- VERSION ----
 // esc(): échappe les valeurs utilisateur insérées via innerHTML (XSS-safe)
 function esc(v){if(v==null)return '';return String(v).replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
-var APP_VERSION='10.7';
+var APP_VERSION='10.8';
 var APP_DATE='2026-05-15';
 var UPDATE_URL_KEY='308win_update_url';
 
@@ -15485,6 +15491,20 @@ renderMaintenanceAlerts();
 })();
 
 
+</script>
+<script>
+// PWA — Enregistrement du service worker
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('./sw.js')
+      .then(function(reg){
+        console.log('[PWA] Service worker enregistré — scope:', reg.scope);
+      })
+      .catch(function(err){
+        console.warn('[PWA] Enregistrement service worker échoué:', err);
+      });
+  });
+}
 </script>
 </body>
 </html>
